@@ -377,7 +377,7 @@ const buyCourse = async (req, res) => {
     console.log("Received Course ID in buyCourse:", courseId);
 
     const course = await Course.findById(courseId)
-      .populate('tutor', 'name') // Assuming the tutor is a related document
+      .populate('tutor', 'name') 
       .select('coursetitle price thumbnail lessons difficulty');
     if (!course) {
       console.error("Course not found for ID:", courseId);

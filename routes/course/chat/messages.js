@@ -1,10 +1,11 @@
-// const express = require("express");
-// const chatRoute = express.Router();
-// const { addMessage, getMessages } = require("../controllers/messageController");
+const express = require('express')
+const verifyTutor = require('../../../middleware/verifyTutor')
+const { getMessages, sendMessage } = require('../../../controller/messageController')
+
+const messageRouter = express.Router()
+
+messageRouter.get("/", getMessages)
+messageRouter.post("/send", sendMessage)
 
 
-// chatRoute.post("/addmsg/", addMessage);
-// chatRoute.post("/getmsg/", getMessages);
-
-// module.exports = chatRoute;
-
+module.exports = messageRouter
