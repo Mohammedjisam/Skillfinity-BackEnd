@@ -52,8 +52,10 @@ app.use("/user",userRoute)
 app.use("/user/data",dataRoutes)
 app.use("/tutor",tutorRoute)
 app.use("/tutor/course",courseRoute)
+// app.use('/tutor/course/chat',chatRoute)
 app.use('/admin',adminRoute)
 app.use('/auth',authRoute)
+
 
 
 
