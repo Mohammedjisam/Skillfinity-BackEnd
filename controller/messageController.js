@@ -29,9 +29,9 @@ const sendMessage = async (req, res) => {
   }
 
   await Promise.all([conversation.save(), newMessage.save()]);
-  return  true
+  // return  true
 
-  // res.status(201).json(newMessage);
+  res.status(201).json(newMessage);
 };
 
 const getMessages = async (req, res) => {

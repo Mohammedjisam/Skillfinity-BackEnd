@@ -19,10 +19,9 @@ const getUsersByTutorCourses = async (req, res) => {
 
     const courseIds = courses.map((course) => course._id);
 
-    // Find all purchases that include these courses
     const purchases = await Purchase.find({
       "items.courseId": { $in: courseIds },
-    }).populate("userId", "name email"); // Populate user details (customize fields as needed)
+    }).populate("userId", "name email");
 
     if (!purchases.length) {
       return res
@@ -30,7 +29,6 @@ const getUsersByTutorCourses = async (req, res) => {
         .json({ message: "No users have purchased these courses." });
     }
 
-    // Extract unique users from the purchases
     const uniqueUsers = Array.from(
       new Set(purchases.map((purchase) => purchase.userId._id.toString()))
     ).map((userId) => {

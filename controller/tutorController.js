@@ -78,8 +78,8 @@ const login = async (req, res) => {
         .json({ message: "Your account is blocked. Contact support." });
 
     if (await bcrypt.compare(password, user.password)) {
-      generateAccessTokenTutor(res, user); // Pass the entire user object
-      generateRefreshTokenTutor(res, user); // Pass the entire user object
+      generateAccessTokenTutor(res, user); 
+      generateRefreshTokenTutor(res, user); 
       res.status(200).json({ message: "Login successful", userData: user });
     } else {
       res.status(401).json({ message: "Invalid email or password" });

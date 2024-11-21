@@ -67,20 +67,31 @@ const io = socket(server, {
 });
 
 global.onlineUsers = new Map();
+
 io.on("connection", (socket) => {
-  global.chatSocket = socket;
+  console.log("New client connected:", socket.id);
+
   socket.on("add-user", (userId) => {
     onlineUsers.set(userId, socket.id);
+    console.log("User added to onlineUsers map:", userId, socket.id);
   });
 
   socket.on("send-msg", (data) => {
     const sendUserSocket = onlineUsers.get(data.to);
-    console.log("dlsjfisdoif")
-    console.log(sendUserSocket)
+    console.log("Sending message:", data.msg, "To:", sendUserSocket);
     if (sendUserSocket) {
       socket.to(sendUserSocket).emit("msg-recieve", data.msg);
-    }
-  });
+    } else {
+      console.log("Recipient socket not found for user:", data.to);
+    }
+  });
+
+  // Handle client disconnection
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
 });
+
+
 
 

@@ -5,6 +5,7 @@ const Category = require("../model/categoryModel");
 const User = require("../model/userModel");
 const Purchase = require("../model/purchaseModel");
 const Report = require('../model/reportModel');
+const Wishlist = require('../model/wishlistModel')
 
 const viewAllCourse = async (req, res) => {
   try {
@@ -178,7 +179,6 @@ const viewCart = async (req, res) => {
       model: "courses",
       select: "coursetitle thumbnail price",
     });
-    // console.log("carttt_______>", cart);
 
     if (!cart) {
       return res.status(404).json({ message: "Cart is empty" });
@@ -447,7 +447,6 @@ const purchaseCourse = async (req, res) => {
       return res.status(400).json({ error: "User ID and course IDs are required" });
     }
 
-    // Create a new purchase record
     const purchase = new Purchase({
       userId,
       items: courseIds.map((courseId) => ({ courseId })),
@@ -502,7 +501,6 @@ const viewLessonsByCourse = async (req, res) => {
     const { courseId } = req.params;
     console.log("ithaanu :",courseId)
 
-    // Fetch lessons that belong to the specified course
     const lessons = await Lesson.find({ course: courseId })
       .populate('course', 'coursetitle')
       .populate('tutor', 'name');
@@ -525,7 +523,6 @@ const getBuyedCourses = async (req, res) => {
     const { userId } = req.params;
     console.log("Fetching courses for user:", userId);
 
-    // Find all purchases by the user
     const purchases = await Purchase.find({ userId }).populate({
       path: "items.courseId",
       model: "courses",
@@ -536,7 +533,6 @@ const getBuyedCourses = async (req, res) => {
       ],
     });
 
-    // Extract purchased courses
     const purchasedCourses = purchases.flatMap((purchase) =>
       purchase.items.map((item) => item.courseId)
     );
@@ -588,30 +584,25 @@ const reportCourse = async (req, res) => {
   try {
     const { userId, courseId, reason, comment } = req.body;
 
-    // Verify that the user has purchased the course
     const purchase = await Purchase.findOne({ userId, "items.courseId": courseId });
     if (!purchase) {
       return res.status(403).json({ message: "You can only report courses you have purchased." });
     }
 
-    // Retrieve the course to get the tutor ID
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({ message: "Course not found." });
     }
 
-    // Create a new report
     const report = new Report({
       userId,
       courseId,
-      tutorId: course.tutor, // Assuming the tutor is stored in the Course model
+      tutorId: course.tutor, 
       reason,
       comment,
     });
 
     const savedReport = await report.save();
-
-    // Increment the reported count for the course
     course.reportedCount += 1;
     await course.save();
 
@@ -622,4 +613,133 @@ const reportCourse = async (req, res) => {
   }
 };
 
-module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse};
+const addToWishlist = async (req, res) => {
+  try {
+    const { courseId, userId } = req.params;
+    console.log("wishlist===========>",courseId)
+    console.log("wishlistuser ===========>",userId)
+    let wishlist = await Wishlist.findOne({ userId });
+    if (!wishlist) {
+      wishlist = new Wishlist({ userId, items: [courseId] });
+    } else {
+      if (!wishlist.items.includes(courseId)) {
+        wishlist.items.push(courseId);
+      }
+    }
+
+    await wishlist.save();
+    res.status(200).json({ message: "Course added to wishlist successfully!", wishlist });
+  } catch (error) {
+    console.error("Error in addToWishlist:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const viewWishlist = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const wishlist = await Wishlist.findOne({ userId }).populate({
+      path: "items",
+      model: "courses",
+      select: "coursetitle thumbnail price category",
+      populate: [
+        {
+          path: "tutor",
+          model: "user",
+          select: "name"
+        },
+        {
+          path: "category",
+          model: "categories",
+          select: "title"
+        }
+      ]
+    });
+
+    if (!wishlist || wishlist.items.length === 0) {
+      return res.status(404).json({ message: "Wishlist is empty" });
+    }
+
+    // Fetch purchased courses for the user
+    const purchases = await Purchase.find({ userId });
+    const purchasedCourseIds = new Set(
+      purchases.flatMap(purchase => 
+        purchase.items.map(item => item.courseId.toString())
+      )
+    );
+
+    // Filter out purchased courses from the wishlist
+    const filteredWishlist = wishlist.items.filter(
+      (course) => !purchasedCourseIds.has(course._id.toString())
+    ).map(course => ({
+      coursetitle: course.coursetitle,
+      thumbnail: course.thumbnail,
+      price: course.price,
+      tutorname: course.tutor ? course.tutor.name : 'Unknown',
+      categoryname: course.category ? course.category.title : 'Uncategorized'
+    }));
+
+    // Remove purchased courses from the wishlist in the database
+    const coursesToRemove = wishlist.items.filter(
+      (course) => purchasedCourseIds.has(course._id.toString())
+    );
+    if (coursesToRemove.length > 0) {
+      await Wishlist.updateOne(
+        { userId },
+        { $pull: { items: { $in: coursesToRemove.map(course => course._id) } } }
+      );
+    }
+
+    if (filteredWishlist.length === 0) {
+      return res.status(404).json({ message: "No wishlist items available to display" });
+    }
+
+    res.status(200).json({ wishlist: filteredWishlist });
+  } catch (error) {
+    console.error("Error in viewWishlist:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const checkWishlistStatus = async (req, res) => {
+  try {
+    const { courseId, userId } = req.params;
+    
+    const wishlist = await Wishlist.findOne({ userId });
+    
+    if (!wishlist) {
+      return res.status(200).json({ isInWishlist: false });
+    }
+    
+    const isInWishlist = wishlist.items.includes(courseId);
+    
+    res.status(200).json({ isInWishlist });
+  } catch (error) {
+    console.error("Error in checkWishlistStatus:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const removeFromWishlist = async (req, res) => {
+  try {
+    const { courseId, userId } = req.params;
+
+    const result = await Wishlist.updateOne(
+      { userId },
+      { $pull: { items: courseId } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Course not found in wishlist or wishlist is empty" });
+    }
+
+    res.status(200).json({ message: "Course removed from wishlist successfully" });
+  } catch (error) {
+    console.error("Error in removeFromWishlist:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+
+module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist};

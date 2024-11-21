@@ -88,8 +88,8 @@ const adminLogin = async (req, res) => {
     if (!adminInfo) return res.status(401).json({ message: "Invalid email or password" });
 
     if (await bcrypt.compare(password, adminInfo.password)) {
-      generateAccessTokenAdmin(res, adminInfo); // Pass the entire user object
-      generateRefreshTokenAdmin(res, adminInfo); // Pass the entire user object
+      generateAccessTokenAdmin(res, adminInfo); 
+      generateRefreshTokenAdmin(res, adminInfo); 
       return res.status(200).json({
         message: "Login successful",
         adminData: adminInfo,
