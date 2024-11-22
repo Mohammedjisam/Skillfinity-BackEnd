@@ -66,13 +66,25 @@ const io = socket(server, {
   },
 });
 
-global.onlineUsers = new Map();
+const onlineUsers = new Map();
+setInterval(() => {
+  console.log(
+    onlineUsers
+  );
+  
+}, 1000);
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
+  const userID = socket.handshake.auth.userId || null;
+  console.log(userID)
+  if(userID){
+    onlineUsers.set(userID, socket.id);
+    onlineUsers.set(socket.id,userID);
+  }
+
   socket.on("add-user", (userId) => {
-    onlineUsers.set(userId, socket.id);
     console.log("User added to onlineUsers map:", userId, socket.id);
   });
 
@@ -89,7 +101,13 @@ io.on("connection", (socket) => {
   // Handle client disconnection
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
+    const userId = onlineUsers.get(socket.id);
+    onlineUsers.delete(userId)
+    onlineUsers.delete(socket.id)
   });
+
+
+
 });
 
 

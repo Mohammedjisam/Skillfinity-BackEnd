@@ -95,10 +95,10 @@ const toggleCourseVisibility = async (req, res) => {
 const addCart = async (req, res) => {
   try {
     const courseId = req.params.courseId;
-    console.log("dvidnvij", courseId);
+    console.log("dvidnvij==============>", courseId);
     const { userId } = req.body;
 
-    console.log("jvifjbijbibjububu", userId);
+    console.log("jvifjbijbibjububu===============>", userId);
 
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
@@ -167,12 +167,9 @@ const cartCount = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 const viewCart = async (req, res) => {
   try {
     const { userId } = req.body;
-
-    console.log("jvifjbijbibjububu", userId);
 
     const cart = await Cart.findOne({ userId }).populate({
       path: "items.courseId",
@@ -180,14 +177,31 @@ const viewCart = async (req, res) => {
       select: "coursetitle thumbnail price",
     });
 
+    // If no cart exists, return empty cart with success status
     if (!cart) {
-      return res.status(404).json({ message: "Cart is empty" });
+      return res.status(200).json({ 
+        cart: { 
+          userId,
+          items: [],
+        },
+        message: "Your cart is waiting to be filled with amazing courses!",
+        success: true
+      });
     }
 
-    res.status(200).json({ cart });
+    // Return existing cart
+    res.status(200).json({ 
+      cart,
+      success: true
+    });
+
   } catch (error) {
     console.error("Error in viewCart:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ 
+      message: "Unable to fetch cart at this time. Please try again later.", 
+      error: error.message,
+      success: false 
+    });
   }
 };
 
@@ -657,7 +671,11 @@ const viewWishlist = async (req, res) => {
     });
 
     if (!wishlist || wishlist.items.length === 0) {
-      return res.status(404).json({ message: "Wishlist is empty" });
+      return res.status(200).json({ 
+        wishlist: [],
+        message: "Your wishlist is waiting to be filled with amazing courses! Start exploring our collection today.",
+        status: "empty"
+      });
     }
 
     // Fetch purchased courses for the user
@@ -672,6 +690,7 @@ const viewWishlist = async (req, res) => {
     const filteredWishlist = wishlist.items.filter(
       (course) => !purchasedCourseIds.has(course._id.toString())
     ).map(course => ({
+      id: course._id,
       coursetitle: course.coursetitle,
       thumbnail: course.thumbnail,
       price: course.price,
@@ -691,13 +710,24 @@ const viewWishlist = async (req, res) => {
     }
 
     if (filteredWishlist.length === 0) {
-      return res.status(404).json({ message: "No wishlist items available to display" });
+      return res.status(200).json({ 
+        wishlist: [],
+        message: "Ready to start learning? Browse our courses and add your favorites to your wishlist!",
+        status: "empty"
+      });
     }
 
-    res.status(200).json({ wishlist: filteredWishlist });
+    res.status(200).json({ 
+      wishlist: filteredWishlist,
+      status: "success"
+    });
   } catch (error) {
     console.error("Error in viewWishlist:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ 
+      message: "We're having trouble fetching your wishlist. Please try again in a moment.",
+      error: error.message,
+      status: "error"
+    });
   }
 };
 
