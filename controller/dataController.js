@@ -6,6 +6,7 @@ const User = require("../model/userModel");
 const Purchase = require("../model/purchaseModel");
 const Report = require('../model/reportModel');
 const Wishlist = require('../model/wishlistModel')
+const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
 const viewAllCourse = async (req, res) => {
   try {
@@ -48,33 +49,53 @@ const viewCourse = async (req, res) => {
   }
 };
 
-const viewCourseAdmin = async (req, res) => {
+const viewCourseAdmin = async (req, res) => { 
   try {
     const courseId = req.params.courseId;
     const userId = req.params.userId;
     console.log("courseId received:", courseId);
 
+    // Fetch the course from the database
     const course = await Course.findById(courseId)
       .populate("tutor")
       .populate("lessons")
-      .populate("category").lean()
-
-      const isUserReported = await Report.findOne({ userId, courseId }) 
-
-      course.isReported = isUserReported ? true : false
-      
+      .populate("category")
+      .lean();
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
+    // Check if the course should be hidden based on the condition
+    const shouldHideCourse = 
+      (course.totalStudents > 10 && course.reportedCount > 0.4 * course.totalStudents) || 
+      (course.totalStudents <= 10 && course.reportedCount >= 4);
+
+    // If the course needs to be hidden and is currently visible, update the database
+    if (shouldHideCourse && course.isVisible) {
+      const updatedCourse = await Course.findByIdAndUpdate(
+        courseId, 
+        { isVisible: false },
+        { new: true }
+      );
+      course.isVisible = updatedCourse.isVisible; // Update locally to reflect the change
+      console.log(`Course ${courseId} has been hidden due to high report count.`);
+    }
+
+    // Check if the user has reported the course
+    const isUserReported = await Report.findOne({ userId, courseId });
+    course.isReported = !!isUserReported;
+
     console.log("Course data:", course);
     res.status(200).json({ course });
   } catch (error) {
-    console.error("Error in viewCourse:", error);
+    console.error("Error in viewCourseAdmin:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
 
 
 const toggleCourseVisibility = async (req, res) => {
@@ -91,6 +112,8 @@ const toggleCourseVisibility = async (req, res) => {
     });
   }
 };
+
+
 
 const addCart = async (req, res) => {
   try {
@@ -469,12 +492,19 @@ const purchaseCourse = async (req, res) => {
 
     await purchase.save();
 
+    await Promise.all(courseIds.map(async (courseId) => {
+      await Course.findByIdAndUpdate(courseId, { $inc: { totalStudents: 1 } });
+      // Check and update course visibility after incrementing totalStudents
+      await checkAndUpdateCourseVisibility(courseId);
+    }));
+
     res.status(200).json({ message: "Purchase recorded successfully" });
   } catch (error) {
     console.error("Error saving purchase:", error);
     res.status(500).json({ error: "Failed to record purchase" });
   }
 };
+
 
 const checkPurchaseStatus = async (req, res) => {
   try {
@@ -772,4 +802,4 @@ const removeFromWishlist = async (req, res) => {
 
 
 
-module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist};
+module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist};

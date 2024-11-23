@@ -31,25 +31,39 @@ const CourseSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  lessons: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'lessons',
-  }],
-  courseStructure:[{
-    type:String,
-    required:true,
-  }],
+  lessons: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'lessons',
+    },
+  ],
+  courseStructure: [
+    {
+      type: String,
+      required: true,
+    },
+  ],
+  quizzes: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'quizes', // Reference to the Quiz model
+    },
+  ],
   isVisible: {
     type: Boolean,
     default: true,
   },
-  reportedCount:{
+  totalStudents: {
     type: Number,
-    default:0,
-  }
-},{
+    default: 0,
+  },
+  reportedCount: {
+    type: Number,
+    default: 0,
+  },
+}, {
   timestamps: true,
- });
+});
 
 const Course = mongoose.model('courses', CourseSchema);
-module.exports =Course;
+module.exports = Course;

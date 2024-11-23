@@ -2,52 +2,54 @@ const Conversation = require("../model/conversationModel");
 const Message = require("../model/messageModel");
 
 const sendMessage = async (req, res) => {
-  console.log("sendMessage");
-  const { from : senderId, to : recieverId, message } = req.body;
+  try {
+    console.log("sendMessage");
+    const { from: senderId, to: recieverId, message } = req.body;
 
-  console.log(req.body)
+    console.log(req.body);
 
-
-  let conversation = await Conversation.findOne({
-    participants: { $all: [senderId, recieverId] },
-  });
-
-  if (!conversation) {
-    conversation = await Conversation.create({
-      participants: [senderId, recieverId],
+    // Find or create a conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [senderId, recieverId] },
     });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [senderId, recieverId],
+      });
+    }
+
+    // Create a new message
+    const newMessage = await Message.create({
+      conversationId: conversation._id,
+      senderId,
+      recieverId,
+      message,
+    });
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  const newMessage = new Message({
-    senderId,
-    recieverId,
-    message,
-  });
-
-  if (newMessage) {
-    conversation.messages.push(newMessage._id);
-  }
-
-  await Promise.all([conversation.save(), newMessage.save()]);
-  // return  true
-
-  res.status(201).json(newMessage);
 };
 
 const getMessages = async (req, res) => {
   try {
-    const { from :senderId, to: userToChatId } = req.query;
+    const { from: senderId, to: userToChatId } = req.query;
 
-    console.log("in gett all messages=====>", userToChatId, senderId);
-    console.log(req.query)
+    console.log("in get all messages=====>", userToChatId, senderId);
+    console.log(req.query);
 
+    // Find the conversation
     const conversation = await Conversation.findOne({
       participants: { $all: [senderId, userToChatId] },
-    }).populate("messages");
+    });
 
     if (!conversation) return res.status(200).json([]);
 
-    const messages = conversation.messages;
+    // Get all messages for this conversation
+    const messages = await Message.find({ conversationId: conversation._id });
 
     res.status(200).json(messages);
   } catch (error) {
