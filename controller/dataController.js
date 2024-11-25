@@ -6,6 +6,7 @@ const User = require("../model/userModel");
 const Purchase = require("../model/purchaseModel");
 const Report = require('../model/reportModel');
 const Wishlist = require('../model/wishlistModel')
+const UserQuizResult = require("../model/UserQuizResult");
 const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
 const viewAllCourse = async (req, res) => {
@@ -800,6 +801,55 @@ const removeFromWishlist = async (req, res) => {
   }
 };
 
+const getCourseCompletionCertificate = async (req, res) => {
+  try {
+    const { courseId, userId } = req.params;
+
+    // Check if the user has purchased the course
+    const purchase = await Purchase.findOne({ userId, "items.courseId": courseId });
+    if (!purchase) {
+      return res.status(403).json({ message: "You must purchase the course to receive a certificate." });
+    }
+
+    // Get the latest quiz result for this course and user
+    const latestQuizResult = await UserQuizResult.findOne({ userId, courseId })
+      .sort({ createdAt: -1 })
+      .limit(1);
+
+    if (!latestQuizResult) {
+      return res.status(404).json({ message: "No quiz results found for this course." });
+    }
+
+    // Calculate the percentage score
+    const percentageScore = (latestQuizResult.totalMarks / latestQuizResult.totalQuestions) * 100;
+
+    if (percentageScore < 90) {
+      return res.status(403).json({ message: "You need to score at least 90% to receive a certificate." });
+    }
+
+    // Fetch course and user details
+    const course = await Course.findById(courseId).populate('tutor', 'name');
+    const user = await User.findById(userId);
+
+    if (!course || !user) {
+      return res.status(404).json({ message: "Course or user not found." });
+    }
+
+    // Generate certificate data
+    const certificateData = {
+      studentName: user.name,
+      courseName: course.coursetitle,
+      tutorName: course.tutor.name,
+      completionDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
+      score: percentageScore.toFixed(2)
+    };
+
+    res.status(200).json({ certificateData });
+  } catch (error) {
+    console.error("Error generating certificate:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 
-module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist};
+module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate};

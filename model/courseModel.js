@@ -46,7 +46,7 @@ const CourseSchema = new mongoose.Schema({
   quizzes: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'quizes', // Reference to the Quiz model
+      ref: 'quizes', 
     },
   ],
   isVisible: {
