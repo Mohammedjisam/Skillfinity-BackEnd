@@ -4,6 +4,10 @@ const UserQuizResult = require('../model/UserQuizResult');
 const mongoose = require('mongoose');
 const Certificate = require('../model/certificateModel');
 const User = require("../model/userModel");
+const fs = require('fs');
+const PDFDocument = require('pdfkit');
+const path = require('path');
+
 
 const addQuiz = async (req, res) => {
   console.log('addQuiz function called');
@@ -71,10 +75,10 @@ const getQuiz = async (req, res) => {
 
 const issueCertificate = async (req, res) => {
   try {
-    const { userName, tutorName, courseName, quizScorePercentage } = req.body;
+    const { userId, tutorId, courseName, quizScorePercentage } = req.body;
 
     // Validate input
-    if (!userName || !tutorName || !courseName || quizScorePercentage == null) {
+    if (!userId || !tutorId || !courseName || quizScorePercentage == null) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
@@ -82,10 +86,21 @@ const issueCertificate = async (req, res) => {
       return res.status(400).json({ message: "Quiz score percentage must be between 0 and 100." });
     }
 
+    // Fetch user and tutor details to validate IDs and optionally populate names
+    const user = await User.findById(userId);
+    const tutor = await User.findById(tutorId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (!tutor) {
+      return res.status(404).json({ message: "Tutor not found." });
+    }
+
     // Create a new certificate
     const newCertificate = new Certificate({
-      userName,
-      tutorName,
+      userId,
+      tutorId,
       courseName,
       quizScorePercentage,
     });
@@ -103,12 +118,34 @@ const issueCertificate = async (req, res) => {
   }
 };
 
+const checkCertificate = async (req, res) => {
+  try {
+    const { userId, courseId } = req.params;
+
+    if (!userId || !courseId) {
+      return res.status(400).json({ message: "User ID and Course ID are required." });
+    }
+
+    const certificate = await Certificate.findOne({ userId, courseId });
+
+    if (certificate) {
+      return res.status(200).json({ exists: true, certificate });
+    }
+
+    res.status(200).json({ exists: false });
+  } catch (error) {
+    console.error("Error checking certificate:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const submitQuizResult = async (req, res) => {
   try {
-    const { userId, courseId, quizId, questionResults } = req.body;
+    const { userId, tutorId, courseId, quizId, questionResults } = req.body;
 
-    if (!userId || !courseId || !quizId || !Array.isArray(questionResults) || questionResults.length === 0) {
-      return res.status(400).json({ message: "Invalid input. Please provide all required fields." });
+    // Validate input
+    if (!userId || !tutorId || !courseId || !quizId || !Array.isArray(questionResults)) {
+      return res.status(400).json({ message: "Missing required fields." });
     }
 
     const quiz = await Quiz.findById(quizId);
@@ -119,9 +156,9 @@ const submitQuizResult = async (req, res) => {
     const totalQuestions = quiz.questions.length;
     let totalMarks = 0;
 
-    // Ensure all questions have valid IDs and user answers
-    const processedResults = questionResults.map(result => {
-      const question = quiz.questions.find(q => q._id.toString() === result.questionId);
+    // Process each question result
+    const processedResults = questionResults.map((result) => {
+      const question = quiz.questions.find((q) => q._id.toString() === result.questionId);
 
       if (!question) {
         throw new Error(`Invalid question ID: ${result.questionId}`);
@@ -132,16 +169,18 @@ const submitQuizResult = async (req, res) => {
 
       return {
         questionId: result.questionId,
-        userAnswer: result.userAnswer || null, // Default to null if no answer
+        userAnswer: result.userAnswer || null, // Default to null if not answered
         isCorrect,
       };
     });
 
     const percentageScore = (totalMarks / totalQuestions) * 100;
 
+    // Save quiz result
     const newQuizResult = new UserQuizResult({
       userId,
       courseId,
+      tutorId, // Save tutorId in quiz result for certificate reference
       quizId,
       questionResults: processedResults,
       totalMarks,
@@ -153,16 +192,17 @@ const submitQuizResult = async (req, res) => {
 
     let certificateData = null;
     if (percentageScore >= 90) {
-      const course = await Course.findById(courseId).populate('tutor', 'name');
+      const course = await Course.findById(courseId).populate("tutor", "name");
       const user = await User.findById(userId);
 
       if (course && user) {
         const newCertificate = new Certificate({
           userId,
+          tutorId,
           courseId,
           userName: user.name,
-          tutorName: course.tutor.name,
-          courseName: course.coursetitle,
+          tutorName: course.tutor?.name || "Unknown Tutor",
+          courseName: course.coursetitle || "Course",
           quizScorePercentage: percentageScore,
         });
 
@@ -180,15 +220,34 @@ const submitQuizResult = async (req, res) => {
         certificateData,
       },
     });
-
   } catch (error) {
     console.error("Error submitting quiz result:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
+const getUserCertificates = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const certificates = await Certificate.find({ userId })
+      .populate('courseId', 'coursetitle')
+      .populate('tutorId', 'name')
+      .sort({ issuedDate: -1 });
+
+    if (!certificates || certificates.length === 0) {
+      return res.status(404).json({ message: "No certificates found for this user." });
+    }
+
+    res.status(200).json({ certificates });
+  } catch (error) {
+    console.error("Error fetching user certificates:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 
 module.exports = {
-  getQuiz,addQuiz,submitQuizResult,submitQuizResult,issueCertificate
+  getQuiz,addQuiz,submitQuizResult,issueCertificate,checkCertificate ,getUserCertificates
 };
 

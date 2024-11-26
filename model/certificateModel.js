@@ -2,16 +2,19 @@ const mongoose = require('mongoose');
 
 const CertificateSchema = new mongoose.Schema(
   {
-    userName: {
-      type: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'user', // Reference to the User model
       required: true,
     },
-    tutorName: {
-      type: String,
+    tutorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'user', // Reference to the User model (assuming tutors are also stored in the User collection)
       required: true,
     },
-    courseName: {
-      type: String,
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'courses', // Reference to the Courses model
       required: true,
     },
     quizScorePercentage: {
