@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require("../model/userModel");
-const Course = require("../model/courseModel");
+const Purchase = require('../model/purchaseModel');
+const Course = require('../model/courseModel');
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -219,6 +220,167 @@ const viewProfile = async (req, res) => {
   }
 };
 
+const getTutorCourseOrders = async (req, res) => {
+  try {
+    const { tutorId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    // Find all courses by this tutor
+    const tutorCourses = await Course.find({ tutor: tutorId });
+
+    if (tutorCourses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          orders: [],
+          totalPages: 0,
+          currentPage: page,
+          totalOrders: 0,
+          totalRevenue: 0
+        }
+      });
+    }
+
+    const courseIds = tutorCourses.map(course => course._id);
+
+    const orders = await Purchase.aggregate([
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.courseId': { $in: courseIds }
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'items.courseId',
+          foreignField: '_id',
+          as: 'courseDetails'
+        }
+      },
+      {
+        $unwind: '$courseDetails'
+      },
+      {
+        $group: {
+          _id: '$_id',
+          userId: { $first: '$userId' },
+          createdAt: { $first: '$createdAt' },
+          items: {
+            $push: {
+              courseId: '$items.courseId',
+              isReported: '$items.isReported',
+              courseName: '$courseDetails.coursetitle',
+              coursePrice: '$courseDetails.price'
+            }
+          },
+          totalAmount: {
+            $sum: '$courseDetails.price'
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'userDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$userDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          createdAt: 1,
+          'user.name': '$userDetails.name',
+          'user.email': '$userDetails.email',
+          items: 1,
+          totalAmount: 1
+        }
+      }
+    ]);
+
+    const totalOrders = await Purchase.aggregate([
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.courseId': { $in: courseIds }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id'
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ]);
+
+    const total = totalOrders[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    const revenueAggregation = await Purchase.aggregate([
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.courseId': { $in: courseIds }
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'items.courseId',
+          foreignField: '_id',
+          as: 'courseDetails'
+        }
+      },
+      {
+        $unwind: '$courseDetails'
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$courseDetails.price' }
+        }
+      }
+    ]);
+
+    const totalRevenue = revenueAggregation[0]?.totalRevenue || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orders,
+        totalPages,
+        currentPage: page,
+        totalOrders: total,
+        totalRevenue
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getTutorCourseOrders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching course order details',
+      error: error.message
+    });
+  }
+};
+
+
+
 module.exports = {
   signUp,
   login,
@@ -228,4 +390,5 @@ module.exports = {
   resetPassword,
   sendOtp,
   viewProfile,
+  getTutorCourseOrders
 };

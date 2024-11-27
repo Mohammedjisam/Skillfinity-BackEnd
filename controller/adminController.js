@@ -1,6 +1,8 @@
 const express = require("express");
 const User = require("../model/userModel");
 const Category = require('../model/categoryModel');
+const Purchase = require('../model/purchaseModel');
+const Course = require('../model/courseModel'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require("dotenv").config();
@@ -266,6 +268,20 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+const getAllStudentOrders = async (req, res) => {
+  try {
+    const purchases = await Purchase.find()
+      .populate('userId', 'name email') // Populate user details
+      .populate('items.courseId', 'coursetitle price') // Populate course details
+      .sort({ createdAt: -1 }); // Sort by most recent orders
+
+    res.status(200).json({ purchases });
+  } catch (error) {
+    console.error("Error fetching student orders:", error);
+    res.status(500).json({ error: "Failed to fetch student orders" });
+  }
+};
+
 
 
 module.exports = {
@@ -283,4 +299,5 @@ module.exports = {
   getCategories,
   updateCategory,
   deleteCategory,
+  getAllStudentOrders
 };

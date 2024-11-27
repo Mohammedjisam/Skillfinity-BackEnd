@@ -1,6 +1,6 @@
 const express = require("express")
 const adminRoute = express.Router()
-const { adminLogin,logoutAdmin,forgotPassword,resetPassword,students,tutors,listUser,unlistUser,unlisTtutor,lisTtutor,getCategories,updateCategory,deleteCategory,addCategory} = require("../../controller/adminController")
+const { adminLogin,logoutAdmin,forgotPassword,resetPassword,students,tutors,listUser,unlistUser,unlisTtutor,lisTtutor,getCategories,updateCategory,deleteCategory,addCategory,getAllStudentOrders} = require("../../controller/adminController")
 const verifyAdmin = require('../../middleware/verifyAdmin')
 
 adminRoute.post('/login',adminLogin)
@@ -17,5 +17,6 @@ adminRoute.post('/addcategory',verifyAdmin, addCategory)
 adminRoute.get('/categories', getCategories)
 adminRoute.put('/category/:id',verifyAdmin, updateCategory)
 adminRoute.delete('/category/:id',verifyAdmin, deleteCategory)
+adminRoute.get("/orders",verifyAdmin, getAllStudentOrders)
 
 module.exports = adminRoute

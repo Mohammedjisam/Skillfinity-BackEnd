@@ -2,6 +2,7 @@ const Course = require('../model/courseModel');
 const Lesson = require('../model/lessonModel')
 const Category= require('../model/categoryModel')
 
+
 const addCourse = async (req, res) => {
   try {
     const { coursetitle, category, price, features, thumbnail, tutor, difficulty, courseStructure } = req.body;
