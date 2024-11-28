@@ -11,7 +11,20 @@ const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
 const viewAllCourse = async (req, res) => {
   try {
-    const courses = await Course.find()
+    const courses = await Course.find({isVisible:true})
+      .populate("tutor")
+      .populate("lessons")
+      .populate("category");
+    res.status(200).json({ courses });
+  } catch (error) {
+    console.error("Error in viewAllCourse:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const viewAllCourseAdmin = async (req, res) => {
+  try {
+    const courses = await Course.find({})
       .populate("tutor")
       .populate("lessons")
       .populate("category");
@@ -65,22 +78,6 @@ const viewCourseAdmin = async (req, res) => {
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
-    }
-
-    // Check if the course should be hidden based on the condition
-    const shouldHideCourse = 
-      (course.totalStudents > 10 && course.reportedCount > 0.4 * course.totalStudents) || 
-      (course.totalStudents <= 10 && course.reportedCount >= 4);
-
-    // If the course needs to be hidden and is currently visible, update the database
-    if (shouldHideCourse && course.isVisible) {
-      const updatedCourse = await Course.findByIdAndUpdate(
-        courseId, 
-        { isVisible: false },
-        { new: true }
-      );
-      course.isVisible = updatedCourse.isVisible; // Update locally to reflect the change
-      console.log(`Course ${courseId} has been hidden due to high report count.`);
     }
 
     // Check if the user has reported the course
@@ -338,7 +335,7 @@ const viewTutor = async (req, res) => {
       return res.status(404).json({ message: "Tutor not found" });
     }
 
-    const courses = await Course.find({ tutor: tutorId })
+    const courses = await Course.find({ tutor: tutorId,isVisible:true })
       .populate({
         path: "category",
         model: "categories",
@@ -651,6 +648,24 @@ const reportCourse = async (req, res) => {
     course.reportedCount += 1;
     await course.save();
 
+      // Check if the course should be hidden based on the condition
+      const shouldHideCourse = 
+      (course.totalStudents > 10 && course.reportedCount > 0.4 * course.totalStudents) || 
+      (course.totalStudents <= 10 && course.reportedCount >= 6);
+      console.log(shouldHideCourse,"vjdsnjfv----------------------------")
+    // If the course needs to be hidden and is currently visible, update the database
+    if (shouldHideCourse && course.isVisible) {
+      console.log("iniside blocking-------------------")
+      const updatedCourse = await Course.findByIdAndUpdate(
+        courseId, 
+        { isVisible: false },
+        { new: true }
+      );
+      course.isVisible = updatedCourse.isVisible; // Update locally to reflect the change
+      console.log(`Course ${courseId} has been hidden due to high report count.`);
+    }
+
+
     res.status(201).json({ message: "Report submitted successfully.", report: savedReport });
   } catch (error) {
     console.error("Error submitting report:", error);
@@ -852,4 +867,4 @@ const getCourseCompletionCertificate = async (req, res) => {
 };
 
 
-module.exports = {viewAllCourse,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate};
+module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate};

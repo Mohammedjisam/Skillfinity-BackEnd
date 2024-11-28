@@ -107,31 +107,89 @@ const adminLogin = async (req, res) => {
 
 const students = async(req, res) => {
   try {
+    // Get all students
     const students = await User.find({role: "student"});
-    console.log(students);
+    
     if(!students) {
       return res.status(404).json({message: "No students found"});
     }
-    return res.status(200).json({message: "Students data fetched successfully", students});
+
+    // Get purchase counts for each student with proper aggregation
+    const studentsWithPurchases = await Promise.all(
+      students.map(async (student) => {
+        // Find all purchases for this student and count unique courses
+        const purchases = await Purchase.aggregate([
+          { 
+            $match: { 
+              userId: student._id 
+            }
+          },
+          {
+            $unwind: "$items" // Deconstruct the items array
+          },
+          {
+            $group: {
+              _id: "$userId",
+              uniqueCourses: { $addToSet: "$items.courseId" }, // Get unique courseIds
+              totalCourses: { $sum: 1 } // Count total courses
+            }
+          }
+        ]);
+
+        const courseCount = purchases.length > 0 ? purchases[0].uniqueCourses.length : 0;
+        
+        return {
+          ...student.toObject(),
+          coursePurchased: courseCount
+        };
+      })
+    );
+
+    return res.status(200).json({
+      message: "Students data fetched successfully", 
+      students: studentsWithPurchases
+    });
+
   } catch(error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
+
 const tutors = async(req, res) => {
   try {
     const tutors = await User.find({role: "tutor"});
-    console.log(tutors);
+    
     if(!tutors) {
       return res.status(404).json({message: "No tutors found"});
     }
-    return res.status(200).json({message: "Tutors data fetched successfully", tutors});
+
+    // Get course counts for each tutor
+    const tutorsWithCourses = await Promise.all(
+      tutors.map(async (tutor) => {
+        // Count courses created by this tutor
+        const courseCount = await Course.countDocuments({ tutor: tutor._id });
+        
+        return {
+          ...tutor.toObject(),
+          coursesTaken: courseCount
+        };
+      })
+    );
+
+    return res.status(200).json({
+      message: "Tutors data fetched successfully", 
+      tutors: tutorsWithCourses
+    });
+
   } catch(error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 const logoutAdmin = async (req, res) => {
   res.clearCookie('accessTokenAdmin', {
