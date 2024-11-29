@@ -28,15 +28,15 @@ function generateAccessTokenTutor(res, user) {
     }, 
     process.env.ACCESS_TOKEN_SECRET, 
     {
-      expiresIn: "15m", // Changed from 1m to 15m for better user experience
+      expiresIn: "15m",
     }
   );
 
   res.cookie("accessTokenTutor", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Set to true in production
+    secure: process.env.NODE_ENV === 'production', 
     sameSite: "strict",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 15 * 60 * 1000, 
   });
 }
 
@@ -48,15 +48,15 @@ function generateAccessTokenAdmin(res, user) {
     }, 
     process.env.ACCESS_TOKEN_SECRET, 
     {
-      expiresIn: "15m", // Changed from 1m to 15m for better user experience
+      expiresIn: "15m", 
     }
   );
 
   res.cookie("accessTokenAdmin", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Set to true in production
+    secure: process.env.NODE_ENV === 'production', 
     sameSite: "strict",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 15 * 60 * 1000, 
   });
 }
 

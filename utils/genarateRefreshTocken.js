@@ -8,15 +8,15 @@ function generateRefreshTokenStudent(res, user) {
     }, 
     process.env.REFRESH_TOKEN_SECRET, 
     {
-      expiresIn: "7d", // Token expires in 7 days
+      expiresIn: "7d", 
     }
   );
 
   res.cookie("refreshTokenStudent", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Set to true in production
+    secure: process.env.NODE_ENV === 'production', 
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, 
   });
 }
 
@@ -28,15 +28,15 @@ function generateRefreshTokenTutor(res, user) {
     }, 
     process.env.REFRESH_TOKEN_SECRET, 
     {
-      expiresIn: "7d", // Token expires in 7 days
+      expiresIn: "7d", 
     }
   );
 
   res.cookie("refreshTokenTutor", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Set to true in production
+    secure: process.env.NODE_ENV === 'production', 
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, 
   });
 }
 
@@ -48,15 +48,15 @@ function generateRefreshTokenAdmin(res, user) {
     }, 
     process.env.REFRESH_TOKEN_SECRET, 
     {
-      expiresIn: "7d", // Token expires in 7 days
+      expiresIn: "7d", 
     }
   );
 
   res.cookie("refreshTokenAdmin", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Set to true in production
+    secure: process.env.NODE_ENV === 'production', 
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, 
   });
 }
 

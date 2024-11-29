@@ -79,8 +79,6 @@ const viewCourseAdmin = async (req, res) => {
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
-
-    // Check if the user has reported the course
     const isUserReported = await Report.findOne({ userId, courseId });
     course.isReported = !!isUserReported;
 
@@ -492,7 +490,6 @@ const purchaseCourse = async (req, res) => {
 
     await Promise.all(courseIds.map(async (courseId) => {
       await Course.findByIdAndUpdate(courseId, { $inc: { totalStudents: 1 } });
-      // Check and update course visibility after incrementing totalStudents
       await checkAndUpdateCourseVisibility(courseId);
     }));
 
@@ -648,12 +645,10 @@ const reportCourse = async (req, res) => {
     course.reportedCount += 1;
     await course.save();
 
-      // Check if the course should be hidden based on the condition
       const shouldHideCourse = 
       (course.totalStudents > 10 && course.reportedCount > 0.4 * course.totalStudents) || 
       (course.totalStudents <= 10 && course.reportedCount >= 6);
       console.log(shouldHideCourse,"vjdsnjfv----------------------------")
-    // If the course needs to be hidden and is currently visible, update the database
     if (shouldHideCourse && course.isVisible) {
       console.log("iniside blocking-------------------")
       const updatedCourse = await Course.findByIdAndUpdate(
@@ -661,7 +656,7 @@ const reportCourse = async (req, res) => {
         { isVisible: false },
         { new: true }
       );
-      course.isVisible = updatedCourse.isVisible; // Update locally to reflect the change
+      course.isVisible = updatedCourse.isVisible; 
       console.log(`Course ${courseId} has been hidden due to high report count.`);
     }
 
@@ -676,18 +671,21 @@ const reportCourse = async (req, res) => {
 const addToWishlist = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
-    console.log("wishlist===========>",courseId)
-    console.log("wishlistuser ===========>",userId)
+    console.log("Adding to wishlist - Course ID:", courseId, "User ID:", userId);
+
     let wishlist = await Wishlist.findOne({ userId });
     if (!wishlist) {
       wishlist = new Wishlist({ userId, items: [courseId] });
     } else {
       if (!wishlist.items.includes(courseId)) {
         wishlist.items.push(courseId);
+      } else {
+        return res.status(200).json({ message: "Course already in wishlist" });
       }
     }
 
     await wishlist.save();
+    console.log("Wishlist updated successfully");
     res.status(200).json({ message: "Course added to wishlist successfully!", wishlist });
   } catch (error) {
     console.error("Error in addToWishlist:", error);
@@ -698,6 +696,8 @@ const addToWishlist = async (req, res) => {
 const viewWishlist = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log("Viewing wishlist for User ID:", userId);
+
     const wishlist = await Wishlist.findOne({ userId }).populate({
       path: "items",
       model: "courses",
@@ -717,25 +717,15 @@ const viewWishlist = async (req, res) => {
     });
 
     if (!wishlist || wishlist.items.length === 0) {
+      console.log("Wishlist is empty for User ID:", userId);
       return res.status(200).json({ 
         wishlist: [],
-        message: "Your wishlist is waiting to be filled with amazing courses! Start exploring our collection today.",
+        message: "Your wishlist is empty.",
         status: "empty"
       });
     }
 
-    // Fetch purchased courses for the user
-    const purchases = await Purchase.find({ userId });
-    const purchasedCourseIds = new Set(
-      purchases.flatMap(purchase => 
-        purchase.items.map(item => item.courseId.toString())
-      )
-    );
-
-    // Filter out purchased courses from the wishlist
-    const filteredWishlist = wishlist.items.filter(
-      (course) => !purchasedCourseIds.has(course._id.toString())
-    ).map(course => ({
+    const formattedWishlist = wishlist.items.map(course => ({
       id: course._id,
       coursetitle: course.coursetitle,
       thumbnail: course.thumbnail,
@@ -744,27 +734,9 @@ const viewWishlist = async (req, res) => {
       categoryname: course.category ? course.category.title : 'Uncategorized'
     }));
 
-    // Remove purchased courses from the wishlist in the database
-    const coursesToRemove = wishlist.items.filter(
-      (course) => purchasedCourseIds.has(course._id.toString())
-    );
-    if (coursesToRemove.length > 0) {
-      await Wishlist.updateOne(
-        { userId },
-        { $pull: { items: { $in: coursesToRemove.map(course => course._id) } } }
-      );
-    }
-
-    if (filteredWishlist.length === 0) {
-      return res.status(200).json({ 
-        wishlist: [],
-        message: "Ready to start learning? Browse our courses and add your favorites to your wishlist!",
-        status: "empty"
-      });
-    }
-
+    console.log("Wishlist retrieved successfully for User ID:", userId);
     res.status(200).json({ 
-      wishlist: filteredWishlist,
+      wishlist: formattedWishlist,
       status: "success"
     });
   } catch (error) {
@@ -776,6 +748,30 @@ const viewWishlist = async (req, res) => {
     });
   }
 };
+
+const removeFromWishlist = async (req, res) => {
+  try {
+    const { courseId, userId } = req.params;
+    console.log("Removing from wishlist - Course ID:", courseId, "User ID:", userId);
+
+    const result = await Wishlist.updateOne(
+      { userId },
+      { $pull: { items: courseId } }
+    );
+
+    if (result.modifiedCount === 0) {
+      console.log("Course not found in wishlist or wishlist is empty");
+      return res.status(404).json({ message: "Course not found in wishlist or wishlist is empty" });
+    }
+
+    console.log("Course removed from wishlist successfully");
+    res.status(200).json({ message: "Course removed from wishlist successfully" });
+  } catch (error) {
+    console.error("Error in removeFromWishlist:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 
 const checkWishlistStatus = async (req, res) => {
   try {
@@ -796,37 +792,17 @@ const checkWishlistStatus = async (req, res) => {
   }
 };
 
-const removeFromWishlist = async (req, res) => {
-  try {
-    const { courseId, userId } = req.params;
 
-    const result = await Wishlist.updateOne(
-      { userId },
-      { $pull: { items: courseId } }
-    );
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ message: "Course not found in wishlist or wishlist is empty" });
-    }
-
-    res.status(200).json({ message: "Course removed from wishlist successfully" });
-  } catch (error) {
-    console.error("Error in removeFromWishlist:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
 
 const getCourseCompletionCertificate = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
 
-    // Check if the user has purchased the course
     const purchase = await Purchase.findOne({ userId, "items.courseId": courseId });
     if (!purchase) {
       return res.status(403).json({ message: "You must purchase the course to receive a certificate." });
     }
 
-    // Get the latest quiz result for this course and user
     const latestQuizResult = await UserQuizResult.findOne({ userId, courseId })
       .sort({ createdAt: -1 })
       .limit(1);
@@ -835,22 +811,17 @@ const getCourseCompletionCertificate = async (req, res) => {
       return res.status(404).json({ message: "No quiz results found for this course." });
     }
 
-    // Calculate the percentage score
     const percentageScore = (latestQuizResult.totalMarks / latestQuizResult.totalQuestions) * 100;
 
     if (percentageScore < 90) {
       return res.status(403).json({ message: "You need to score at least 90% to receive a certificate." });
     }
-
-    // Fetch course and user details
     const course = await Course.findById(courseId).populate('tutor', 'name');
     const user = await User.findById(userId);
 
     if (!course || !user) {
       return res.status(404).json({ message: "Course or user not found." });
     }
-
-    // Generate certificate data
     const certificateData = {
       studentName: user.name,
       courseName: course.coursetitle,
@@ -867,4 +838,40 @@ const getCourseCompletionCertificate = async (req, res) => {
 };
 
 
-module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate};
+const viewCourseReports = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    // Fetch the course details
+    const course = await Course.findById(courseId).select('coursetitle');
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // Fetch all reports for this course
+    const reports = await Report.find({ courseId })
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 });
+
+    // Prepare the response data
+    const reportData = {
+      courseTitle: course.coursetitle,
+      totalReports: reports.length,
+      reports: reports.map(report => ({
+        id: report._id,
+        userName: report.userId.name,
+        userEmail: report.userId.email,
+        reason: report.reason,
+        comment: report.comment,
+        reportedAt: report.createdAt
+      }))
+    };
+
+    res.status(200).json(reportData);
+  } catch (error) {
+    console.error("Error fetching course reports:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports};

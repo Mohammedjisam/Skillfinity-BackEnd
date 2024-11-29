@@ -1,6 +1,6 @@
 const express = require("express");
 const dataRoute = express.Router();
-const { viewAllCourse,viewAllCourseAdmin, viewCourse,viewCourseAdmin, addCart,cartCount,checkPurchaseStatus, viewCart,viewLessons,removeCart,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,buyCourse,buyAllCourses,purchaseCourse ,getPurchasedCourses ,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,} = require('../../controller/dataController');
+const { viewAllCourse,viewAllCourseAdmin, viewCourse,viewCourseAdmin, addCart,cartCount,checkPurchaseStatus, viewCart,viewLessons,removeCart,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,buyCourse,buyAllCourses,purchaseCourse ,getPurchasedCourses ,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports} = require('../../controller/dataController');
 const {addQuiz,getQuiz,submitQuizResult,issueCertificate,checkCertificate,getUserCertificates,downloadCertificate} = require('../../controller/quizController')
 const {getTutorRevenue} = require("../../controller/revnueController")
 const verifyUser = require('../../middleware/verifyUser')
@@ -41,6 +41,10 @@ dataRoute.get('/certificate/check/:userId/:courseId', verifyUser, checkCertifica
 dataRoute.get('/usercertificates/:userId', verifyUser, getUserCertificates);
 dataRoute.get('/tutorrevenue/:tutorId', getTutorRevenue);
 dataRoute.get('/viewallcourseadmin', viewAllCourseAdmin); 
+dataRoute.post('/addtowishlist/:courseId/:userId', verifyUser, addToWishlist);
+dataRoute.get('/viewwishlist/:userId', verifyUser, viewWishlist);
+dataRoute.delete('/removefromwishlist/:courseId/:userId', verifyUser, removeFromWishlist);
+dataRoute.get('/coursereports/:courseId', viewCourseReports);
 
 
 

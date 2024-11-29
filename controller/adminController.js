@@ -107,17 +107,14 @@ const adminLogin = async (req, res) => {
 
 const students = async(req, res) => {
   try {
-    // Get all students
     const students = await User.find({role: "student"});
     
     if(!students) {
       return res.status(404).json({message: "No students found"});
     }
 
-    // Get purchase counts for each student with proper aggregation
     const studentsWithPurchases = await Promise.all(
       students.map(async (student) => {
-        // Find all purchases for this student and count unique courses
         const purchases = await Purchase.aggregate([
           { 
             $match: { 
@@ -125,13 +122,13 @@ const students = async(req, res) => {
             }
           },
           {
-            $unwind: "$items" // Deconstruct the items array
+            $unwind: "$items" 
           },
           {
             $group: {
               _id: "$userId",
-              uniqueCourses: { $addToSet: "$items.courseId" }, // Get unique courseIds
-              totalCourses: { $sum: 1 } // Count total courses
+              uniqueCourses: { $addToSet: "$items.courseId" }, 
+              totalCourses: { $sum: 1 } 
             }
           }
         ]);
@@ -166,10 +163,8 @@ const tutors = async(req, res) => {
       return res.status(404).json({message: "No tutors found"});
     }
 
-    // Get course counts for each tutor
     const tutorsWithCourses = await Promise.all(
       tutors.map(async (tutor) => {
-        // Count courses created by this tutor
         const courseCount = await Course.countDocuments({ tutor: tutor._id });
         
         return {
@@ -329,9 +324,9 @@ const deleteCategory = async (req, res) => {
 const getAllStudentOrders = async (req, res) => {
   try {
     const purchases = await Purchase.find()
-      .populate('userId', 'name email') // Populate user details
-      .populate('items.courseId', 'coursetitle price') // Populate course details
-      .sort({ createdAt: -1 }); // Sort by most recent orders
+      .populate('userId', 'name email') 
+      .populate('items.courseId', 'coursetitle price') 
+      .sort({ createdAt: -1 });
 
     res.status(200).json({ purchases });
   } catch (error) {

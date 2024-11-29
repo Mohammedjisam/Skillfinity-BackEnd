@@ -77,7 +77,6 @@ const issueCertificate = async (req, res) => {
   try {
     const { userId, tutorId, courseName, quizScorePercentage } = req.body;
 
-    // Validate input
     if (!userId || !tutorId || !courseName || quizScorePercentage == null) {
       return res.status(400).json({ message: "All fields are required." });
     }
@@ -86,7 +85,6 @@ const issueCertificate = async (req, res) => {
       return res.status(400).json({ message: "Quiz score percentage must be between 0 and 100." });
     }
 
-    // Fetch user and tutor details to validate IDs and optionally populate names
     const user = await User.findById(userId);
     const tutor = await User.findById(tutorId);
 
@@ -97,7 +95,6 @@ const issueCertificate = async (req, res) => {
       return res.status(404).json({ message: "Tutor not found." });
     }
 
-    // Create a new certificate
     const newCertificate = new Certificate({
       userId,
       tutorId,
@@ -105,7 +102,6 @@ const issueCertificate = async (req, res) => {
       quizScorePercentage,
     });
 
-    // Save to database
     await newCertificate.save();
 
     res.status(201).json({
@@ -143,7 +139,6 @@ const submitQuizResult = async (req, res) => {
   try {
     const { userId, tutorId, courseId, quizId, questionResults } = req.body;
 
-    // Validate input
     if (!userId || !tutorId || !courseId || !quizId || !Array.isArray(questionResults)) {
       return res.status(400).json({ message: "Missing required fields." });
     }
@@ -156,7 +151,7 @@ const submitQuizResult = async (req, res) => {
     const totalQuestions = quiz.questions.length;
     let totalMarks = 0;
 
-    // Process each question result
+
     const processedResults = questionResults.map((result) => {
       const question = quiz.questions.find((q) => q._id.toString() === result.questionId);
 
@@ -169,7 +164,7 @@ const submitQuizResult = async (req, res) => {
 
       return {
         questionId: result.questionId,
-        userAnswer: result.userAnswer || null, // Default to null if not answered
+        userAnswer: result.userAnswer || null, 
         isCorrect,
       };
     });
@@ -180,7 +175,7 @@ const submitQuizResult = async (req, res) => {
     const newQuizResult = new UserQuizResult({
       userId,
       courseId,
-      tutorId, // Save tutorId in quiz result for certificate reference
+      tutorId,
       quizId,
       questionResults: processedResults,
       totalMarks,
