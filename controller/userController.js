@@ -1,5 +1,7 @@
 const express = require("express");
 const User = require("../model/userModel");
+const Purchase = require('../model/purchaseModel');
+const Course = require('../model/courseModel');
 const bcrypt = require('bcryptjs');
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -45,10 +47,26 @@ const signUp = async (req, res) => {
         const newUser = await User.create({
             name, password: passwordHash, email, phone, role: "student", user_id: userId
         });
-        res.status(200).json({ message: "User is registered", userData: newUser });
+
+        // Generate access and refresh tokens
+        generateAccessTokenStudent(res, newUser);
+        generateRefreshTokenStudent(res, newUser);
+
+        res.status(200).json({ 
+            success: true,
+            message: "User registered successfully", 
+            userData: {
+                _id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                phone: newUser.phone,
+                role: newUser.role,
+                user_id: newUser.user_id
+            }
+        });
     } catch (error) {
         console.error("Error in signUp:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
 
@@ -182,4 +200,5 @@ const logoutUser = (req, res) => {
     res.status(200).json({ message: 'Logged out successfully' });
 };
 
-module.exports = { signUp, login, updateUser, logoutUser, forgotPassword, resetPassword, sendOtp };
+module.exports = { signUp, login, updateUser, logoutUser, forgotPassword, resetPassword, sendOtp
+};

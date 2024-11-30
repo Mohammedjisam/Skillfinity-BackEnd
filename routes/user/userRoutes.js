@@ -1,6 +1,7 @@
 const express = require("express");
 const userRoute = express.Router();
 const { signUp, login, logoutUser, updateUser, forgotPassword, resetPassword, sendOtp } = require('../../controller/userController');
+const {getTutorsByUserBuyedCourse}= require('../../controller/usersCourseController')
 const { verifyOtp}  = require('../../middleware/verifyOtp')
 const verifyUser= require('../../middleware/verifyUser')
 
@@ -11,5 +12,7 @@ userRoute.post('/forgot', forgotPassword);
 userRoute.post('/reset/:token', resetPassword);
 userRoute.put('/update',verifyUser, updateUser);
 userRoute.post("/logout",verifyUser, logoutUser);
+userRoute.get('/purchasedcoursetutors', verifyUser, getTutorsByUserBuyedCourse);
+
 
 module.exports = userRoute;

@@ -59,10 +59,26 @@ const signUp = async (req, res) => {
       role: "tutor",
       user_id: userId,
     });
-    res.status(200).json({ message: "Tutor is registered", userData: newUser });
+
+    // Generate access and refresh tokens
+    generateAccessTokenTutor(res, newUser);
+    generateRefreshTokenTutor(res, newUser);
+
+    res.status(200).json({ 
+      success: true,
+      message: "Tutor registered successfully", 
+      userData: {
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        user_id: newUser.user_id
+      }
+    });
   } catch (error) {
     console.error("Error in signUp:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
 
