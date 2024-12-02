@@ -79,15 +79,41 @@ const addLesson = async (req, res) => {
 const viewCourse = async (req, res) => {
   try {
     const tutorId = req.params.id;
-    console.log("gfshgvfsh",tutorId)
-    const courses = await Course.find({ tutor: tutorId }).populate('category').populate('tutor');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9; // Changed to 9 for 3x3 grid
+    const skip = (page - 1) * limit;
+
+    const [courses, totalCourses] = await Promise.all([
+      Course.find({ tutor: tutorId })
+        .populate('category')
+        .populate('tutor')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      Course.countDocuments({ tutor: tutorId })
+    ]);
     
-    res.status(200).json({ courses });
+    const totalPages = Math.ceil(totalCourses / limit);
+    
+    res.status(200).json({ 
+      courses,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCourses,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        itemsPerPage: limit
+      }
+    });
   } catch (error) {
     console.error("Error in viewCourse:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
 
 const deleteCourse = async (req, res) => {
   try {

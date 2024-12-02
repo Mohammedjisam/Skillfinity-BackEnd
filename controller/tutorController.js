@@ -11,6 +11,7 @@ const crypto = require("crypto");
 const { mailSender, otpEmailTemplate } = require("../utils/nodeMailer");
 const { generateAccessTokenTutor } = require("../utils/genarateAccesTocken");
 const { generateRefreshTokenTutor } = require("../utils/genarateRefreshTocken");
+const moment = require('moment');
 
 const sendOtp = async (req, res) => {
   const { email } = req.body;
@@ -240,8 +241,9 @@ const getTutorCourseOrders = async (req, res) => {
   try {
     const { tutorId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
+    const limit = 5; // Show 5 items per page
     const skip = (page - 1) * limit;
+    const filter = req.query.filter || 'all';
 
     // Find all courses by this tutor
     const tutorCourses = await Course.find({ tutor: tutorId });
@@ -254,18 +256,40 @@ const getTutorCourseOrders = async (req, res) => {
           totalPages: 0,
           currentPage: page,
           totalOrders: 0,
-          totalRevenue: 0
+          totalRevenue: 0,
+          itemsPerPage: limit
         }
       });
     }
 
     const courseIds = tutorCourses.map(course => course._id);
 
-    const orders = await Purchase.aggregate([
+    // Define date filter based on the selected option
+    let dateFilter = {};
+    const now = moment();
+    switch (filter) {
+      case 'lastDay':
+        dateFilter = { createdAt: { $gte: now.subtract(1, 'days').toDate() } };
+        break;
+      case 'lastWeek':
+        dateFilter = { createdAt: { $gte: now.subtract(7, 'days').toDate() } };
+        break;
+      case 'lastMonth':
+        dateFilter = { createdAt: { $gte: now.subtract(30, 'days').toDate() } };
+        break;
+      case 'lastYear':
+        dateFilter = { createdAt: { $gte: now.subtract(1, 'years').toDate() } };
+        break;
+      default:
+        dateFilter = {};
+    }
+
+    const aggregationPipeline = [
       { $unwind: '$items' },
       {
         $match: {
-          'items.courseId': { $in: courseIds }
+          'items.courseId': { $in: courseIds },
+          ...dateFilter
         }
       },
       {
@@ -298,59 +322,52 @@ const getTutorCourseOrders = async (req, res) => {
         }
       },
       { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: limit },
       {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'userDetails'
-        }
-      },
-      {
-        $unwind: {
-          path: '$userDetails',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $project: {
-          _id: 1,
-          createdAt: 1,
-          'user.name': '$userDetails.name',
-          'user.email': '$userDetails.email',
-          items: 1,
-          totalAmount: 1
+        $facet: {
+          metadata: [
+            { $count: "total" },
+            { $addFields: { pages: { $ceil: { $divide: ["$total", limit] } } } }
+          ],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: 'users',
+                localField: 'userId',
+                foreignField: '_id',
+                as: 'userDetails'
+              }
+            },
+            {
+              $unwind: {
+                path: '$userDetails',
+                preserveNullAndEmptyArrays: true
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                createdAt: 1,
+                'user.name': '$userDetails.name',
+                'user.email': '$userDetails.email',
+                items: 1,
+                totalAmount: 1
+              }
+            }
+          ]
         }
       }
-    ]);
+    ];
 
-    const totalOrders = await Purchase.aggregate([
+    const [result] = await Purchase.aggregate(aggregationPipeline);
+
+    const totalRevenue = await Purchase.aggregate([
       { $unwind: '$items' },
       {
         $match: {
-          'items.courseId': { $in: courseIds }
-        }
-      },
-      {
-        $group: {
-          _id: '$_id'
-        }
-      },
-      {
-        $count: 'total'
-      }
-    ]);
-
-    const total = totalOrders[0]?.total || 0;
-    const totalPages = Math.ceil(total / limit);
-
-    const revenueAggregation = await Purchase.aggregate([
-      { $unwind: '$items' },
-      {
-        $match: {
-          'items.courseId': { $in: courseIds }
+          'items.courseId': { $in: courseIds },
+          ...dateFilter
         }
       },
       {
@@ -372,16 +389,17 @@ const getTutorCourseOrders = async (req, res) => {
       }
     ]);
 
-    const totalRevenue = revenueAggregation[0]?.totalRevenue || 0;
+    const { total, pages } = result.metadata[0] || { total: 0, pages: 0 };
 
     res.status(200).json({
       success: true,
       data: {
-        orders,
-        totalPages,
+        orders: result.data,
+        totalPages: pages,
         currentPage: page,
         totalOrders: total,
-        totalRevenue
+        totalRevenue: totalRevenue[0]?.totalRevenue || 0,
+        itemsPerPage: limit
       }
     });
 

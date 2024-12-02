@@ -24,16 +24,61 @@ const viewAllCourse = async (req, res) => {
 
 const viewAllCourseAdmin = async (req, res) => {
   try {
-    const courses = await Course.find({})
-      .populate("tutor")
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const searchTerm = req.query.search || '';
+    const categoryFilter = req.query.category || 'All';
+    
+    // Build the filter query
+    let filter = {};
+    
+    // Add search filter
+    if (searchTerm) {
+      filter.$or = [
+        { coursetitle: { $regex: searchTerm, $options: 'i' } },
+        { 'tutor.name': { $regex: searchTerm, $options: 'i' } }
+      ];
+    }
+    
+    // Add category filter
+    if (categoryFilter !== 'All') {
+      const category = await Category.findOne({ title: categoryFilter });
+      if (category) {
+        filter.category = category._id;
+      }
+    }
+
+    // Get total count for pagination
+    const totalCourses = await Course.countDocuments(filter);
+    const totalPages = Math.ceil(totalCourses / limit);
+    const skip = (page - 1) * limit;
+
+    // Get paginated and filtered courses
+    const courses = await Course.find(filter)
+      .populate("tutor", "name email")
       .populate("lessons")
-      .populate("category");
-    res.status(200).json({ courses });
+      .populate("category")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Get all categories for filter options
+    const categories = await Category.distinct('title');
+
+    res.status(200).json({
+      courses,
+      currentPage: page,
+      totalPages,
+      totalCourses,
+      categories: ['All', ...categories]
+    });
   } catch (error) {
     console.error("Error in viewAllCourse:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
 
 const viewCourse = async (req, res) => {
   try {
@@ -193,36 +238,73 @@ const viewCart = async (req, res) => {
     const cart = await Cart.findOne({ userId }).populate({
       path: "items.courseId",
       model: "courses",
-      select: "coursetitle thumbnail price",
+      select: "coursetitle thumbnail price difficulty lessons category tutor",
+      populate: [
+        {
+          path: "category",
+          model: "categories",
+          select: "title",
+        },
+        {
+          path: "tutor",
+          model: "user",
+          select: "name",
+        },
+        {
+          path: "lessons",
+          model: "lessons",
+          select: "_id",
+        },
+      ],
     });
 
     // If no cart exists, return empty cart with success status
     if (!cart) {
-      return res.status(200).json({ 
-        cart: { 
+      return res.status(200).json({
+        cart: {
           userId,
           items: [],
         },
         message: "Your cart is waiting to be filled with amazing courses!",
-        success: true
+        success: true,
       });
     }
 
-    // Return existing cart
-    res.status(200).json({ 
-      cart,
-      success: true
-    });
+    // Transform cart to include additional course details
+    const enrichedCart = {
+      ...cart.toObject(),
+      items: cart.items.map((item) => {
+        if (!item.courseId) {
+          return null; // Skip this item if courseId is null
+        }
+        return {
+          ...item.toObject(),
+          courseId: {
+            ...item.courseId.toObject(),
+            totalLessonsCount: item.courseId.lessons ? item.courseId.lessons.length : 0,
+            categoryName: item.courseId.category ? item.courseId.category.title : 'Uncategorized',
+            tutorName: item.courseId.tutor ? `${item.courseId.tutor.firstname || ''} ${item.courseId.tutor.lastname || ''}`.trim() : 'Unknown Tutor',
+          },
+        };
+      }).filter(Boolean), // Remove null items
+    };
 
+    // Return existing cart with enriched course details
+    res.status(200).json({
+      cart: enrichedCart,
+      success: true,
+    });
   } catch (error) {
     console.error("Error in viewCart:", error);
-    res.status(500).json({ 
-      message: "Unable to fetch cart at this time. Please try again later.", 
+    res.status(500).json({
+      message: "Unable to fetch cart at this time. Please try again later.",
       error: error.message,
-      success: false 
+      success: false,
     });
   }
 };
+
+
 
 const removeCart = async (req, res) => {
   try {

@@ -105,30 +105,38 @@ const adminLogin = async (req, res) => {
   }
 };
 
-const students = async(req, res) => {
+const students = async (req, res) => {
   try {
-    const students = await User.find({role: "student"});
-    
-    if(!students) {
-      return res.status(404).json({message: "No students found"});
-    }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const search = req.query.search || '';
+
+    const searchQuery = {
+      role: "student",
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { user_id: { $regex: search, $options: 'i' } }
+      ]
+    };
+
+    const totalStudents = await User.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalStudents / limit);
+
+    const students = await User.find(searchQuery)
+      .skip((page - 1) * limit)
+      .limit(limit);
 
     const studentsWithPurchases = await Promise.all(
       students.map(async (student) => {
         const purchases = await Purchase.aggregate([
-          { 
-            $match: { 
-              userId: student._id 
-            }
-          },
-          {
-            $unwind: "$items" 
-          },
+          { $match: { userId: student._id } },
+          { $unwind: "$items" },
           {
             $group: {
               _id: "$userId",
-              uniqueCourses: { $addToSet: "$items.courseId" }, 
-              totalCourses: { $sum: 1 } 
+              uniqueCourses: { $addToSet: "$items.courseId" },
+              totalCourses: { $sum: 1 }
             }
           }
         ]);
@@ -143,11 +151,14 @@ const students = async(req, res) => {
     );
 
     return res.status(200).json({
-      message: "Students data fetched successfully", 
-      students: studentsWithPurchases
+      message: "Students data fetched successfully",
+      students: studentsWithPurchases,
+      currentPage: page,
+      totalPages: totalPages,
+      totalStudents: totalStudents
     });
 
-  } catch(error) {
+  } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
@@ -157,11 +168,25 @@ const students = async(req, res) => {
 
 const tutors = async(req, res) => {
   try {
-    const tutors = await User.find({role: "tutor"});
-    
-    if(!tutors) {
-      return res.status(404).json({message: "No tutors found"});
-    }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const search = req.query.search || '';
+
+    const searchQuery = {
+      role: "tutor",
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { user_id: { $regex: search, $options: 'i' } }
+      ]
+    };
+
+    const totalTutors = await User.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalTutors / limit);
+
+    const tutors = await User.find(searchQuery)
+      .skip((page - 1) * limit)
+      .limit(limit);
 
     const tutorsWithCourses = await Promise.all(
       tutors.map(async (tutor) => {
@@ -176,7 +201,10 @@ const tutors = async(req, res) => {
 
     return res.status(200).json({
       message: "Tutors data fetched successfully", 
-      tutors: tutorsWithCourses
+      tutors: tutorsWithCourses,
+      currentPage: page,
+      totalPages,
+      totalTutors
     });
 
   } catch(error) {
@@ -281,9 +309,27 @@ const addCategory = async (req, res) => {
 
 const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find();
-    console.log("This is the category request coming ", categories);
-    return res.status(200).json(categories);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const search = req.query.search || '';
+
+    const searchQuery = {
+      title: { $regex: search, $options: 'i' }
+    };
+
+    const totalCategories = await Category.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalCategories / limit);
+
+    const categories = await Category.find(searchQuery)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.status(200).json({
+      categories,
+      currentPage: page,
+      totalPages,
+      totalCategories
+    });
   } catch (error) {
     console.error("Error fetching categories:", error);
     res.status(500).json({ message: "Failed to fetch categories" });
@@ -323,15 +369,80 @@ const deleteCategory = async (req, res) => {
 
 const getAllStudentOrders = async (req, res) => {
   try {
-    const purchases = await Purchase.find()
-      .populate('userId', 'name email') 
-      .populate('items.courseId', 'coursetitle price') 
-      .sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5; 
+    const filterOption = req.query.filterOption || 'all';
 
-    res.status(200).json({ purchases });
+    let dateFilter = {};
+    const now = new Date();
+
+    switch (filterOption) {
+      case 'lastDay':
+        dateFilter = { createdAt: { $gte: new Date(now - 24 * 60 * 60 * 1000) } };
+        break;
+      case 'lastWeek':
+        dateFilter = { createdAt: { $gte: new Date(now - 7 * 24 * 60 * 60 * 1000) } };
+        break;
+      case 'lastMonth':
+        dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()) } };
+        break;
+      case 'lastYear':
+        dateFilter = { createdAt: { $gte: new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) } };
+        break;
+      default:
+        dateFilter = {};
+    }
+
+    const totalOrders = await Purchase.countDocuments(dateFilter);
+    const totalPages = Math.ceil(totalOrders / limit);
+
+    const orders = await Purchase.find(dateFilter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate({
+        path: 'userId',
+        select: 'name email'
+      })
+      .populate({
+        path: 'items.courseId',
+        select: 'coursetitle price'
+      });
+
+    const formattedOrders = orders.map(order => ({
+      _id: order._id,
+      createdAt: order.createdAt,
+      userId: {
+        name: order.userId.name,
+        email: order.userId.email
+      },
+      items: order.items.map(item => ({
+        courseId: item.courseId._id,
+        coursetitle: item.courseId.coursetitle,
+        price: item.courseId.price
+      })),
+      totalAmount: order.items.reduce((total, item) => total + item.courseId.price, 0)
+    }));
+
+    // Calculate total revenue for all orders matching the filter
+    const allOrders = await Purchase.find(dateFilter).populate({
+      path: 'items.courseId',
+      select: 'price'
+    });
+    const totalRevenue = allOrders.reduce((total, order) => 
+      total + order.items.reduce((orderTotal, item) => orderTotal + (item.courseId?.price || 0), 0)
+    , 0);
+
+    res.status(200).json({
+      orders: formattedOrders,
+      currentPage: page,
+      totalPages,
+      totalOrders,
+      totalRevenue
+    });
   } catch (error) {
-    console.error("Error fetching student orders:", error);
-    res.status(500).json({ error: "Failed to fetch student orders" });
+    console.error("Error in getAdminOrders:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
