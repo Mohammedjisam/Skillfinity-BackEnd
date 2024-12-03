@@ -13,17 +13,169 @@ const {generateRefreshTokenAdmin} = require("../utils/genarateRefreshTocken");
 
 const passwordResetTemplate = (resetURL) => {
   return {
-    subject: "Password Reset Request",
+    subject: "Reset Your Password 🔒",
     htmlContent: `
-      <h1>Password Reset Request</h1>
-      <p>You are receiving this because you (or someone else) have requested the reset of the password for your account.</p>
-      <p>Please click on the following link, or paste this into your browser to complete the process:</p>
-      <a href="${resetURL}">${resetURL}</a>
-      <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset</title>
+      </head>
+      <body style="
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+      ">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="
+          background-color: #f5f5f5;
+          padding: 20px;
+        ">
+          <tr>
+            <td align="center">
+              <table cellpadding="0" cellspacing="0" border="0" width="600" style="
+                background-color: #ffffff;
+                border-radius: 10px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+              ">
+                <!-- Header -->
+                <tr>
+                  <td align="center" style="padding: 40px 20px;">
+                    <h1 style="
+                      margin: 0;
+                      font-size: 28px;
+                      color: #333333;
+                    ">
+                      Password Reset Request 🔄
+                    </h1>
+                  </td>
+                </tr>
+
+                <!-- Content -->
+                <tr>
+                  <td align="center" style="padding: 20px;">
+                    <p style="
+                      font-size: 16px;
+                      color: #4b5563;
+                      margin: 0 0 15px 0;
+                    ">
+                      Hello there,
+                    </p>
+                    <p style="
+                      font-size: 16px;
+                      color: #4b5563;
+                      margin: 0 0 15px 0;
+                    ">
+                      We received a request to reset the password for your account. Don't worry, we've got you covered! 😊
+                    </p>
+                    <p style="
+                      font-size: 16px;
+                      color: #4b5563;
+                      margin: 0 0 15px 0;
+                    ">
+                      To reset your password, please click the button below:
+                    </p>
+                    <a href="${resetURL}" style="
+                      background-color: #666666;
+                      color: #ffffff;
+                      padding: 15px 30px;
+                      text-decoration: none;
+                      border-radius: 5px;
+                      display: inline-block;
+                      margin-top: 20px;
+                      font-weight: bold;
+                    ">
+                      Reset Password
+                    </a>
+                    <p style="
+                      font-size: 14px;
+                      color: #4b5563;
+                      margin: 20px 0 0 0;
+                    ">
+                      If the button doesn't work, you can also copy and paste this link into your browser:
+                    </p>
+                    <p style="
+                      font-size: 14px;
+                      color: #666666;
+                      margin: 10px 0;
+                      word-break: break-all;
+                    ">
+                      ${resetURL}
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Instructions -->
+                <tr>
+                  <td align="center" style="padding: 20px;">
+                    <p style="
+                      color: #4b5563;
+                      font-size: 14px;
+                      line-height: 1.6;
+                      margin: 0 0 10px 0;
+                    ">
+                      <strong>Important:</strong> This link will expire in 24 hours for security reasons.
+                    </p>
+                    <p style="
+                      color: #4b5563;
+                      font-size: 14px;
+                      line-height: 1.6;
+                      margin: 0 0 10px 0;
+                    ">
+                      If you didn't request this password reset, please ignore this email. Your password will remain unchanged. 🛡️
+                    </p>
+                    <p style="
+                      color: #4b5563;
+                      font-size: 14px;
+                      line-height: 1.6;
+                      margin: 0;
+                    ">
+                      Stay safe online!
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td align="center" style="
+                    padding: 30px 20px;
+                    background-color: #e0e0e0;
+                    border-bottom-left-radius: 10px;
+                    border-bottom-right-radius: 10px;
+                  ">
+                    <p style="
+                      color: #6b7280;
+                      font-size: 14px;
+                      margin: 0 0 10px 0;
+                    ">
+                      Best regards,<br>The Skillfinity Team 🚀
+                    </p>
+                    <p style="
+                      color: #9ca3af;
+                      font-size: 12px;
+                      margin: 0 0 10px 0;
+                    ">
+                      Need help? 💡 Contact our support team.
+                    </p>
+                    <p style="
+                      color: #9ca3af;
+                      font-size: 12px;
+                      margin: 0;
+                    ">
+                      © ${new Date().getFullYear()} <span style="color: #666666;">Skillfinity</span>. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `
   };
 };
-
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   

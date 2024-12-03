@@ -27,7 +27,7 @@ app.use(cors(
       credentials: true,}
   ))
 
-  mongoose.connect("mongodb://localhost:27017/Skillfinity")
+  mongoose.connect(process.env.MONGODB)
   .then(() => {
     console.log(`MongoDB connected successfully to ${mongoose.connection.name}`);
   })

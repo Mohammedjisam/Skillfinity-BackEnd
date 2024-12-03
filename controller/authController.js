@@ -1,82 +1,116 @@
 const { OAuth2Client } = require('google-auth-library');
-const jwt = require('jsonwebtoken');
 const User = require('../model/userModel');
+const { generateAccessTokenStudent, generateAccessTokenTutor } = require('../utils/genarateAccesTocken');
+const { generateRefreshTokenStudent, generateRefreshTokenTutor } = require('../utils/genarateRefreshTocken');
 require('dotenv').config();
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const googleAuth = async (req, res) => {
-    try {
-        const { credential, role = 'student' } = req.body;
+const googleAuthStudent = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
 
-        // Verify Google ID Token
-        const ticket = await client.verifyIdToken({
-            idToken: credential,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
 
-        const payload = ticket.getPayload();
-        const { email, name, picture, sub: googleId } = payload;
+    let user = await User.findOne({ $or: [{ email }, { googleId }] });
 
-        // Check if user already exists
-        let user = await User.findOne({
-            $or: [
-                { email },
-                { googleId }
-            ]
-        });
-
-        if (!user) {
-            // Create a new user
-            user = new User({
-                name,
-                email,
-                googleId,
-                user_id: googleId,
-                profileImage: picture || null,
-                role,
-                password: null
-            });
-
-            await user.save();
-        } else {
-            // Update existing user if needed
-            user.googleId = googleId;
-            user.name = name;
-            user.profileImage = picture || user.profileImage;
-            user.role = role;
-            await user.save();
-        }
-
-        // Generate JWT token
-        const authToken = jwt.sign(
-            {
-                id: user._id,
-                role: user.role
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Send response
-        res.status(200).json({
-            message: 'Authentication successful',
-            token: authToken,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                profileImage: user.profileImage,
-            },
-        });
-    } catch (error) {
-        console.error('Google authentication error:', error);
-        res.status(500).json({
-            message: 'Google authentication failed. Please try again.',
-            error: error.message
-        });
+    if (!user) {
+      user = new User({
+        name,
+        email,
+        googleId,
+        user_id: googleId,
+        profileImage: picture || null,
+        role: 'student',
+        password: null,
+      });
+      await user.save();
+    } else {
+      if (!user.googleId) user.googleId = googleId;
+      if (!user.profileImage) user.profileImage = picture || user.profileImage;
+      if (user.role !== 'student') user.role = 'student';
+      await user.save();
     }
+
+    generateAccessTokenStudent(res, user);
+    generateRefreshTokenStudent(res, user);
+
+    res.status(200).json({
+      message: 'Student authentication successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
+    });
+  } catch (error) {
+    console.error('Google student authentication error:', error);
+    res.status(500).json({
+      message: 'Google student authentication failed. Please try again.',
+      error: error.message,
+    });
+  }
 };
 
-module.exports = { googleAuth };
+const googleAuthTutor = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+
+    let user = await User.findOne({ $or: [{ email }, { googleId }] });
+
+    if (!user) {
+      user = new User({
+        name,
+        email,
+        googleId,
+        user_id: googleId,
+        profileImage: picture || null,
+        role: 'tutor',
+        password: null,
+      });
+      await user.save();
+    } else {
+      if (!user.googleId) user.googleId = googleId;
+      if (!user.profileImage) user.profileImage = picture || user.profileImage;
+      if (user.role !== 'tutor') user.role = 'tutor';
+      await user.save();
+    }
+
+    generateAccessTokenTutor(res, user);
+    generateRefreshTokenTutor(res, user);
+
+    res.status(200).json({
+      message: 'Tutor authentication successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
+    });
+  } catch (error) {
+    console.error('Google tutor authentication error:', error);
+    res.status(500).json({
+      message: 'Google tutor authentication failed. Please try again.',
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { googleAuthStudent, googleAuthTutor };
+

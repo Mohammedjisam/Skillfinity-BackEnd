@@ -224,23 +224,35 @@ const submitQuizResult = async (req, res) => {
 const getUserCertificates = async (req, res) => {
   try {
     const { userId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5; // 5 certificates per page
+    const skip = (page - 1) * limit;
+
+    const totalCertificates = await Certificate.countDocuments({ userId });
+    const totalPages = Math.ceil(totalCertificates / limit);
 
     const certificates = await Certificate.find({ userId })
       .populate('courseId', 'coursetitle')
       .populate('tutorId', 'name')
-      .sort({ issuedDate: -1 });
+      .sort({ issuedDate: -1 })
+      .skip(skip)
+      .limit(limit);
 
     if (!certificates || certificates.length === 0) {
       return res.status(404).json({ message: "No certificates found for this user." });
     }
 
-    res.status(200).json({ certificates });
+    res.status(200).json({
+      certificates,
+      currentPage: page,
+      totalPages,
+      totalCertificates
+    });
   } catch (error) {
     console.error("Error fetching user certificates:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 module.exports = {
   getQuiz,addQuiz,submitQuizResult,issueCertificate,checkCertificate ,getUserCertificates

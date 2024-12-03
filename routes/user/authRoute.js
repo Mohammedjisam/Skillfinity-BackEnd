@@ -1,7 +1,8 @@
-// authRoute.js
 const express = require('express');
 const router = express.Router();
-const { googleAuth } = require('../../controller/authController'); 
+const { googleAuthStudent, googleAuthTutor } = require('../../controller/authController'); 
 
-router.post("/google", googleAuth);
+router.post('/google/student', googleAuthStudent);
+router.post('/google/tutor', googleAuthTutor);
+
 module.exports = router;

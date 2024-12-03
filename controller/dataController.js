@@ -9,18 +9,91 @@ const Wishlist = require('../model/wishlistModel')
 const UserQuizResult = require("../model/UserQuizResult");
 const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
+
+
+// const viewAllCourse = async (req, res) => {
+//   try {
+//     const courses = await Course.find({isVisible:true})
+//       .populate("tutor")
+//       .populate("lessons")
+//       .populate("category");
+//     res.status(200).json({ courses });
+//   } catch (error) {
+//     console.error("Error in viewAllCourse:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
 const viewAllCourse = async (req, res) => {
   try {
-    const courses = await Course.find({isVisible:true})
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+
+    const totalCourses = await Course.countDocuments({ isVisible: true });
+    const totalPages = Math.ceil(totalCourses / limit);
+
+    const courses = await Course.find({ isVisible: true })
       .populate("tutor")
       .populate("lessons")
-      .populate("category");
-    res.status(200).json({ courses });
+      .populate("category")
+      .skip(skip)
+      .limit(limit);
+
+    res.status(200).json({ 
+      courses,
+      currentPage: page,
+      totalPages,
+      totalCourses,
+    });
   } catch (error) {
     console.error("Error in viewAllCourse:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+// const viewAllCourse = async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 12;
+//     const skip = (page - 1) * limit;
+//     const userId = req.query.userId;
+
+//     let purchasedCourseIds = [];
+//     if (userId) {
+//       const purchases = await Purchase.find({ user: userId });
+//       purchasedCourseIds = purchases.map(purchase => purchase.course.toString());
+//     }
+
+//     const totalCourses = await Course.countDocuments({
+//       isVisible: true,
+//       _id: { $nin: purchasedCourseIds }
+//     });
+
+//     const totalPages = Math.ceil(totalCourses / limit);
+
+//     const courses = await Course.find({
+//       isVisible: true,
+//       _id: { $nin: purchasedCourseIds }
+//     })
+//       .populate("tutor", "name profileImage")
+//       .populate("lessons", "title")
+//       .populate("category", "title")
+//       .skip(skip)
+//       .limit(limit);
+
+//     res.status(200).json({ 
+//       courses,
+//       currentPage: page,
+//       totalPages,
+//       totalCourses
+//     });
+//   } catch (error) {
+//     console.error("Error in viewAllCourse:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
 
 const viewAllCourseAdmin = async (req, res) => {
   try {
@@ -364,30 +437,54 @@ const viewAllCategory = async (req, res) => {
 const viewCategory = async (req, res) => {
   try {
     const categoryId = req.params.categoryId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+
     console.log("categoryId received:", categoryId);
 
-    const category = await Category.findById(categoryId).populate({
-      path: "courses",
-      model: "courses",
-      select: "coursetitle price thumbnail difficulty tutor",
-      populate: {
-        path: "tutor",
-        model: "user",
-        select: "name profileImage",
-      },
-    });
+    const category = await Category.findById(categoryId);
 
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    console.log("Courses with tutors fetched:", category.courses);
-    res.status(200).json({ courses: category.courses });
+    const totalCourses = await Category.aggregate([
+      { $match: { _id: category._id } },
+      { $project: { courseCount: { $size: "$courses" } } }
+    ]);
+
+    const totalCount = totalCourses[0].courseCount;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const populatedCategory = await Category.findById(categoryId)
+      .populate({
+        path: "courses",
+        model: "courses",
+        select: "coursetitle price thumbnail difficulty tutor isVisible",
+        options: { skip: skip, limit: limit },
+        populate: {
+          path: "tutor",
+          model: "user",
+          select: "name profileImage",
+        },
+      });
+
+    const visibleCourses = populatedCategory.courses.filter(course => course.isVisible !== false);
+
+    console.log("Courses with tutors fetched:", visibleCourses);
+    res.status(200).json({ 
+      courses: visibleCourses,
+      currentPage: page,
+      totalPages: totalPages,
+      totalCourses: totalCount
+    });
   } catch (error) {
     console.error("Error in viewCategory:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 const viewAllTutors = async (req, res) => {
   try {
@@ -407,25 +504,46 @@ const viewAllTutors = async (req, res) => {
 const viewTutor = async (req, res) => {
   try {
     const tutorId = req.params.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 8;
+    const skip = (page - 1) * limit;
 
     const tutor = await User.findById(tutorId).select(
-      "name profileImage email role"
+      "name profileImage email role bio"
     );
+    
     if (!tutor || tutor.role !== "tutor") {
       return res.status(404).json({ message: "Tutor not found" });
     }
 
-    const courses = await Course.find({ tutor: tutorId,isVisible:true })
+    // Get total count of visible courses
+    const totalCourses = await Course.countDocuments({ 
+      tutor: tutorId,
+      isVisible: true 
+    });
+
+    // Get paginated courses
+    const courses = await Course.find({ tutor: tutorId, isVisible: true })
       .populate({
         path: "category",
         model: "categories",
         select: "title",
       })
-      .select("coursetitle thumbnail price category");
+      .select("coursetitle thumbnail price category")
+      .skip(skip)
+      .limit(limit);
+
+    const totalPages = Math.ceil(totalCourses / limit);
 
     res.status(200).json({
       tutor,
       courses,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCourses,
+        coursesPerPage: limit
+      }
     });
   } catch (error) {
     console.error("Error in viewTutor:", error);
@@ -642,24 +760,45 @@ const viewLessonsByCourse = async (req, res) => {
 const getBuyedCourses = async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log("Fetching courses for user:", userId);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9; // Changed to 9 for a 3x3 grid
+    const skip = (page - 1) * limit;
 
-    const purchases = await Purchase.find({ userId }).populate({
-      path: "items.courseId",
-      model: "courses",
-      select: "coursetitle thumbnail price category tutor difficulty",
-      populate: [
-        { path: "tutor", model: "user", select: "name profileImage" },
-        { path: "category", model: "categories", select: "title" },
-      ],
-    });
+    console.log(`Fetching courses for user: ${userId}, page: ${page}, limit: ${limit}`);
+
+    const totalCount = await Purchase.countDocuments({ userId });
+
+    const purchases = await Purchase.find({ userId })
+      .populate({
+        path: "items.courseId",
+        model: "courses",
+        select: "coursetitle thumbnail price category tutor difficulty",
+        populate: [
+          { path: "tutor", model: "user", select: "name profileImage" },
+          { path: "category", model: "categories", select: "title" },
+        ],
+      })
+      .skip(skip)
+      .limit(limit);
 
     const purchasedCourses = purchases.flatMap((purchase) =>
       purchase.items.map((item) => item.courseId)
     );
 
-    console.log(`Found ${purchasedCourses.length} purchased courses for user ${userId}`);
-    res.status(200).json({ purchasedCourses });
+    const totalPages = Math.ceil(totalCount / limit);
+
+    console.log(`Found ${purchasedCourses.length} purchased courses for user ${userId} on page ${page}`);
+    console.log(`Total pages: ${totalPages}, Total courses: ${totalCount}`);
+
+    res.status(200).json({
+      purchasedCourses,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCourses: totalCount,
+        coursesPerPage: limit
+      }
+    });
   } catch (error) {
     console.error("Error fetching purchased courses:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -669,6 +808,12 @@ const getBuyedCourses = async (req, res) => {
 const getUserOrderHistory = async (req, res) => {
   try {
     const { userId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5; // 5 orders per page
+    const skip = (page - 1) * limit;
+
+    const totalOrders = await Purchase.countDocuments({ userId });
+    const totalPages = Math.ceil(totalOrders / limit);
 
     const purchases = await Purchase.find({ userId })
       .populate({
@@ -681,7 +826,9 @@ const getUserOrderHistory = async (req, res) => {
           select: "name"
         }
       })
-      .sort({ purchaseDate: -1 });
+      .sort({ purchaseDate: -1 })
+      .skip(skip)
+      .limit(limit);
 
     const orderHistory = purchases.map(purchase => ({
       orderId: purchase._id,
@@ -694,12 +841,18 @@ const getUserOrderHistory = async (req, res) => {
       totalAmount: purchase.items.reduce((total, item) => total + item.courseId.price, 0)
     }));
 
-    res.status(200).json({ orderHistory });
+    res.status(200).json({
+      orderHistory,
+      currentPage: page,
+      totalPages,
+      totalOrders
+    });
   } catch (error) {
     console.error("Error fetching user order history:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 const reportCourse = async (req, res) => {
   try {
@@ -778,36 +931,49 @@ const addToWishlist = async (req, res) => {
 const viewWishlist = async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log("Viewing wishlist for User ID:", userId);
+    const page = parseInt(req.query.page) || 1;
+    const limit = 6; // Items per page
+    const skip = (page - 1) * limit;
 
-    const wishlist = await Wishlist.findOne({ userId }).populate({
-      path: "items",
-      model: "courses",
-      select: "coursetitle thumbnail price category",
-      populate: [
-        {
-          path: "tutor",
-          model: "user",
-          select: "name"
-        },
-        {
-          path: "category",
-          model: "categories",
-          select: "title"
-        }
-      ]
-    });
+    console.log(`Viewing wishlist for User ID: ${userId}, Page: ${page}`);
+
+    const wishlist = await Wishlist.findOne({ userId });
 
     if (!wishlist || wishlist.items.length === 0) {
       console.log("Wishlist is empty for User ID:", userId);
       return res.status(200).json({ 
         wishlist: [],
         message: "Your wishlist is empty.",
-        status: "empty"
+        status: "empty",
+        totalPages: 0,
+        currentPage: page
       });
     }
 
-    const formattedWishlist = wishlist.items.map(course => ({
+    const totalItems = wishlist.items.length;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    const paginatedItems = await Wishlist.findOne({ userId })
+      .populate({
+        path: "items",
+        model: "courses",
+        select: "coursetitle thumbnail price category",
+        options: { skip, limit },
+        populate: [
+          {
+            path: "tutor",
+            model: "user",
+            select: "name"
+          },
+          {
+            path: "category",
+            model: "categories",
+            select: "title"
+          }
+        ]
+      });
+
+    const formattedWishlist = paginatedItems.items.map(course => ({
       id: course._id,
       coursetitle: course.coursetitle,
       thumbnail: course.thumbnail,
@@ -816,10 +982,12 @@ const viewWishlist = async (req, res) => {
       categoryname: course.category ? course.category.title : 'Uncategorized'
     }));
 
-    console.log("Wishlist retrieved successfully for User ID:", userId);
+    console.log(`Wishlist page ${page} retrieved successfully for User ID: ${userId}`);
     res.status(200).json({ 
       wishlist: formattedWishlist,
-      status: "success"
+      status: "success",
+      totalPages,
+      currentPage: page
     });
   } catch (error) {
     console.error("Error in viewWishlist:", error);
@@ -830,6 +998,7 @@ const viewWishlist = async (req, res) => {
     });
   }
 };
+
 
 const removeFromWishlist = async (req, res) => {
   try {
