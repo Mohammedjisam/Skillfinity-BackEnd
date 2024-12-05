@@ -23,7 +23,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
 app.use(cors(
-    {origin: 'http://localhost:5173',
+    {origin: 'https://skillfinity.jassy.in',
       credentials: true,}
   ))
 
@@ -61,18 +61,12 @@ server.listen(PORT, () => {
 
 const io = socket(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "https://skillfinity.jassy.in",
     credentials: true,
   },
 });
 
 const onlineUsers = new Map();
-// setInterval(() => {
-//   console.log(
-//     onlineUsers
-//   );
-  
-// }, 5000);
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);

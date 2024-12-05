@@ -139,7 +139,7 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    const resetURL = `http://localhost:5173/tutor/reset-password/${resetToken}`;
+    const resetURL = `https://skillfinity.jassy.in/tutor/reset-password/${resetToken}`;
     const { subject, htmlContent } = passwordResetTemplate(resetURL);
     await mailSender(email, subject, htmlContent);
 
