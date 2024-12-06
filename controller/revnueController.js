@@ -154,7 +154,7 @@ const getAdminRevenue = async (req, res) => {
       }
     ]);
 
-    // Overall statistics
+
     const overallStats = await Purchase.aggregate([
       { $unwind: '$items' },
       {
