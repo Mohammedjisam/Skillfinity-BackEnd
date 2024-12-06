@@ -74,7 +74,6 @@ const login = async (req, res) => {
     try {
       const { email, password } = req.body;
       const user = await User.findOne({ email });
-      console.log("testing------------------------------------------->")
   
       if (!user) return res.status(401).json({ message: "Invalid email or password" });
       if (user.isActive === false) return res.status(403).json({ message: "Your account is blocked. Contact support." });

@@ -9,21 +9,6 @@ const Wishlist = require('../model/wishlistModel')
 const UserQuizResult = require("../model/UserQuizResult");
 const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
-
-
-// const viewAllCourse = async (req, res) => {
-//   try {
-//     const courses = await Course.find({isVisible:true})
-//       .populate("tutor")
-//       .populate("lessons")
-//       .populate("category");
-//     res.status(200).json({ courses });
-//   } catch (error) {
-//     console.error("Error in viewAllCourse:", error);
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
-
 const viewAllCourse = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -51,49 +36,6 @@ const viewAllCourse = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
-// const viewAllCourse = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 12;
-//     const skip = (page - 1) * limit;
-//     const userId = req.query.userId;
-
-//     let purchasedCourseIds = [];
-//     if (userId) {
-//       const purchases = await Purchase.find({ user: userId });
-//       purchasedCourseIds = purchases.map(purchase => purchase.course.toString());
-//     }
-
-//     const totalCourses = await Course.countDocuments({
-//       isVisible: true,
-//       _id: { $nin: purchasedCourseIds }
-//     });
-
-//     const totalPages = Math.ceil(totalCourses / limit);
-
-//     const courses = await Course.find({
-//       isVisible: true,
-//       _id: { $nin: purchasedCourseIds }
-//     })
-//       .populate("tutor", "name profileImage")
-//       .populate("lessons", "title")
-//       .populate("category", "title")
-//       .skip(skip)
-//       .limit(limit);
-
-//     res.status(200).json({ 
-//       courses,
-//       currentPage: page,
-//       totalPages,
-//       totalCourses
-//     });
-//   } catch (error) {
-//     console.error("Error in viewAllCourse:", error);
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
-
 
 const viewAllCourseAdmin = async (req, res) => {
   try {
@@ -1067,15 +1009,18 @@ const getCourseCompletionCertificate = async (req, res) => {
     if (percentageScore < 90) {
       return res.status(403).json({ message: "You need to score at least 90% to receive a certificate." });
     }
+
     const course = await Course.findById(courseId).populate('tutor', 'name');
     const user = await User.findById(userId);
 
     if (!course || !user) {
       return res.status(404).json({ message: "Course or user not found." });
     }
+
     const certificateData = {
       studentName: user.name,
       courseName: course.coursetitle,
+      tutorId: course.tutor._id, // Add this line to include the tutor ID
       tutorName: course.tutor.name,
       completionDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
       score: percentageScore.toFixed(2)
@@ -1088,6 +1033,21 @@ const getCourseCompletionCertificate = async (req, res) => {
   }
 };
 
+const getTutorData = async (req, res) => {
+  try {
+    const { tutorId } = req.params;
+    const tutor = await User.findById(tutorId).select('name email');
+    
+    if (!tutor) {
+      return res.status(404).json({ message: "Tutor not found." });
+    }
+
+    res.status(200).json({ tutorData: tutor });
+  } catch (error) {
+    console.error("Error fetching tutor data:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 const viewCourseReports = async (req, res) => {
   try {
@@ -1125,4 +1085,4 @@ const viewCourseReports = async (req, res) => {
   }
 };
 
-module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports};
+module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports,getTutorData};
