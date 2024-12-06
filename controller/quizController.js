@@ -225,7 +225,7 @@ const getUserCertificates = async (req, res) => {
   try {
     const { userId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = 5; // 5 certificates per page
+    const limit = 5;
     const skip = (page - 1) * limit;
 
     const totalCertificates = await Certificate.countDocuments({ userId });
