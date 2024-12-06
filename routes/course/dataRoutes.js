@@ -1,7 +1,7 @@
 const express = require("express");
 const dataRoute = express.Router();
 const { viewAllCourse,viewAllCourseAdmin, viewCourse,viewCourseAdmin, addCart,cartCount,checkPurchaseStatus, viewCart,viewLessons,removeCart,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,buyCourse,buyAllCourses,purchaseCourse ,getPurchasedCourses ,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports,getTutorData} = require('../../controller/dataController');
-const {addQuiz,getQuiz,submitQuizResult,issueCertificate,checkCertificate,getUserCertificates,downloadCertificate} = require('../../controller/quizController')
+const {addQuiz,getQuiz,submitQuizResult,issueCertificate,checkCertificate,getUserCertificates} = require('../../controller/quizController')
 const {getTutorRevenue} = require("../../controller/revnueController")
 const verifyUser = require('../../middleware/verifyUser')
 
