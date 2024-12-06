@@ -21,5 +21,4 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: ${{ secrets.SERVER_PORT }}
         script: |
-          cd /Skillfinity-BackEnd
           ./deploy.sh
