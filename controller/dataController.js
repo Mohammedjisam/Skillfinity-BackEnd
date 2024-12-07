@@ -581,7 +581,7 @@ const buyAllCourses = async (req, res) => {
   try {
     console.log("---------------------");
     const { userId, courseIds } = req.body;
-    console.log("uuuuuuuuuuuuuuuser",userId)
+    console.log("uuuuuuuuuuuuuuuser", userId);
 
     const courses = await Course.find({ _id: { $in: courseIds } })
       .populate("tutor", "name")
@@ -607,11 +607,9 @@ const buyAllCourses = async (req, res) => {
       (total, course) => total + course.price,
       0
     );
-    const cart=await Cart.findOneAndUpdate(
-      { userId }
-    );
+    const cart = await Cart.findOne({ userId });
 
-    console.log("cart------------------>",cart)
+    console.log("cart------------------>", cart);
 
     res.status(200).json({
       courses: formattedCourses,
@@ -1041,11 +1039,9 @@ const getCourseCompletionCertificate = async (req, res) => {
       "items.courseId": courseId,
     });
     if (!purchase) {
-      return res
-        .status(403)
-        .json({
-          message: "You must purchase the course to receive a certificate.",
-        });
+      return res.status(403).json({
+        message: "You must purchase the course to receive a certificate.",
+      });
     }
 
     const latestQuizResult = await UserQuizResult.findOne({ userId, courseId })
@@ -1062,11 +1058,9 @@ const getCourseCompletionCertificate = async (req, res) => {
       (latestQuizResult.totalMarks / latestQuizResult.totalQuestions) * 100;
 
     if (percentageScore < 90) {
-      return res
-        .status(403)
-        .json({
-          message: "You need to score at least 90% to receive a certificate.",
-        });
+      return res.status(403).json({
+        message: "You need to score at least 90% to receive a certificate.",
+      });
     }
 
     const course = await Course.findById(courseId).populate("tutor", "name");
