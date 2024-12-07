@@ -607,7 +607,11 @@ const buyAllCourses = async (req, res) => {
       (total, course) => total + course.price,
       0
     );
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findOneAndUpdate(
+      { userId },
+      { $set: { items: [] } },
+      { new: true }
+    );
 
     console.log("cart------------------>", cart);
 
