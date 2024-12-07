@@ -60,13 +60,19 @@ const getQuiz = async (req, res) => {
     }
 
     // Find the quiz for the given course
-    const quiz = await Quiz.findOne({ courseId }).select('questions');
+    const quiz = await Quiz.find({ courseId }).select('questions');
 
     if (!quiz) {
       return res.status(404).json({ message: "Quiz not found for this course." });
     }
+    const quizz=[]
+    for (const element of quiz) {
+      quizz.push(...element.questions)
+    }
 
-    res.status(200).json({ message: "Quiz retrieved successfully.", quiz });
+    res.status(200).json({ message: "Quiz retrieved successfully.", quiz:{
+      questions:quizz
+    } });
   } catch (error) {
     console.error("Error fetching quiz:", error);
     res.status(500).json({ message: "Server error", error: error.message });
