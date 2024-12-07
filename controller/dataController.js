@@ -4,10 +4,10 @@ const Lesson = require("../model/lessonModel");
 const Category = require("../model/categoryModel");
 const User = require("../model/userModel");
 const Purchase = require("../model/purchaseModel");
-const Report = require('../model/reportModel');
-const Wishlist = require('../model/wishlistModel')
+const Report = require("../model/reportModel");
+const Wishlist = require("../model/wishlistModel");
 const UserQuizResult = require("../model/UserQuizResult");
-const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
+const { checkAndUpdateCourseVisibility } = require("../utils/courseUtils");
 
 const viewAllCourse = async (req, res) => {
   try {
@@ -25,7 +25,7 @@ const viewAllCourse = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    res.status(200).json({ 
+    res.status(200).json({
       courses,
       currentPage: page,
       totalPages,
@@ -41,22 +41,22 @@ const viewAllCourseAdmin = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
-    const searchTerm = req.query.search || '';
-    const categoryFilter = req.query.category || 'All';
-    
+    const searchTerm = req.query.search || "";
+    const categoryFilter = req.query.category || "All";
+
     // Build the filter query
     let filter = {};
-    
+
     // Add search filter
     if (searchTerm) {
       filter.$or = [
-        { coursetitle: { $regex: searchTerm, $options: 'i' } },
-        { 'tutor.name': { $regex: searchTerm, $options: 'i' } }
+        { coursetitle: { $regex: searchTerm, $options: "i" } },
+        { "tutor.name": { $regex: searchTerm, $options: "i" } },
       ];
     }
-    
+
     // Add category filter
-    if (categoryFilter !== 'All') {
+    if (categoryFilter !== "All") {
       const category = await Category.findOne({ title: categoryFilter });
       if (category) {
         filter.category = category._id;
@@ -78,22 +78,20 @@ const viewAllCourseAdmin = async (req, res) => {
       .limit(limit);
 
     // Get all categories for filter options
-    const categories = await Category.distinct('title');
+    const categories = await Category.distinct("title");
 
     res.status(200).json({
       courses,
       currentPage: page,
       totalPages,
       totalCourses,
-      categories: ['All', ...categories]
+      categories: ["All", ...categories],
     });
   } catch (error) {
     console.error("Error in viewAllCourse:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
-
 
 const viewCourse = async (req, res) => {
   try {
@@ -104,12 +102,12 @@ const viewCourse = async (req, res) => {
     const course = await Course.findById(courseId)
       .populate("tutor")
       .populate("lessons")
-      .populate("category").lean()
+      .populate("category")
+      .lean();
 
-      const isUserReported = await Report.findOne({ userId, courseId }) 
+    const isUserReported = await Report.findOne({ userId, courseId });
 
-      course.isReported = isUserReported ? true : false
-      
+    course.isReported = isUserReported ? true : false;
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
@@ -123,7 +121,7 @@ const viewCourse = async (req, res) => {
   }
 };
 
-const viewCourseAdmin = async (req, res) => { 
+const viewCourseAdmin = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const userId = req.params.userId;
@@ -150,10 +148,6 @@ const viewCourseAdmin = async (req, res) => {
   }
 };
 
-
-
-
-
 const toggleCourseVisibility = async (req, res) => {
   const { courseId } = req.params;
   try {
@@ -168,8 +162,6 @@ const toggleCourseVisibility = async (req, res) => {
     });
   }
 };
-
-
 
 const addCart = async (req, res) => {
   try {
@@ -233,7 +225,7 @@ const cartCount = async (req, res) => {
       console.log("Cart not found for user ID:", userId);
       return res.status(200).json({
         success: false,
-        message: "Cart is empty"
+        message: "Cart is empty",
       });
     }
 
@@ -288,20 +280,30 @@ const viewCart = async (req, res) => {
     // Transform cart to include additional course details
     const enrichedCart = {
       ...cart.toObject(),
-      items: cart.items.map((item) => {
-        if (!item.courseId) {
-          return null; // Skip this item if courseId is null
-        }
-        return {
-          ...item.toObject(),
-          courseId: {
-            ...item.courseId.toObject(),
-            totalLessonsCount: item.courseId.lessons ? item.courseId.lessons.length : 0,
-            categoryName: item.courseId.category ? item.courseId.category.title : 'Uncategorized',
-            tutorName: item.courseId.tutor ? `${item.courseId.tutor.firstname || ''} ${item.courseId.tutor.lastname || ''}`.trim() : 'Unknown Tutor',
-          },
-        };
-      }).filter(Boolean), // Remove null items
+      items: cart.items
+        .map((item) => {
+          if (!item.courseId) {
+            return null; // Skip this item if courseId is null
+          }
+          return {
+            ...item.toObject(),
+            courseId: {
+              ...item.courseId.toObject(),
+              totalLessonsCount: item.courseId.lessons
+                ? item.courseId.lessons.length
+                : 0,
+              categoryName: item.courseId.category
+                ? item.courseId.category.title
+                : "Uncategorized",
+              tutorName: item.courseId.tutor
+                ? `${item.courseId.tutor.firstname || ""} ${
+                    item.courseId.tutor.lastname || ""
+                  }`.trim()
+                : "Unknown Tutor",
+            },
+          };
+        })
+        .filter(Boolean), // Remove null items
     };
 
     // Return existing cart with enriched course details
@@ -318,8 +320,6 @@ const viewCart = async (req, res) => {
     });
   }
 };
-
-
 
 const removeCart = async (req, res) => {
   try {
@@ -393,40 +393,40 @@ const viewCategory = async (req, res) => {
 
     const totalCourses = await Category.aggregate([
       { $match: { _id: category._id } },
-      { $project: { courseCount: { $size: "$courses" } } }
+      { $project: { courseCount: { $size: "$courses" } } },
     ]);
 
     const totalCount = totalCourses[0].courseCount;
     const totalPages = Math.ceil(totalCount / limit);
 
-    const populatedCategory = await Category.findById(categoryId)
-      .populate({
-        path: "courses",
-        model: "courses",
-        select: "coursetitle price thumbnail difficulty tutor isVisible",
-        options: { skip: skip, limit: limit },
-        populate: {
-          path: "tutor",
-          model: "user",
-          select: "name profileImage",
-        },
-      });
+    const populatedCategory = await Category.findById(categoryId).populate({
+      path: "courses",
+      model: "courses",
+      select: "coursetitle price thumbnail difficulty tutor isVisible",
+      options: { skip: skip, limit: limit },
+      populate: {
+        path: "tutor",
+        model: "user",
+        select: "name profileImage",
+      },
+    });
 
-    const visibleCourses = populatedCategory.courses.filter(course => course.isVisible !== false);
+    const visibleCourses = populatedCategory.courses.filter(
+      (course) => course.isVisible !== false
+    );
 
     console.log("Courses with tutors fetched:", visibleCourses);
-    res.status(200).json({ 
+    res.status(200).json({
       courses: visibleCourses,
       currentPage: page,
       totalPages: totalPages,
-      totalCourses: totalCount
+      totalCourses: totalCount,
     });
   } catch (error) {
     console.error("Error in viewCategory:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 const viewAllTutors = async (req, res) => {
   try {
@@ -453,15 +453,15 @@ const viewTutor = async (req, res) => {
     const tutor = await User.findById(tutorId).select(
       "name profileImage email role bio"
     );
-    
+
     if (!tutor || tutor.role !== "tutor") {
       return res.status(404).json({ message: "Tutor not found" });
     }
 
     // Get total count of visible courses
-    const totalCourses = await Course.countDocuments({ 
+    const totalCourses = await Course.countDocuments({
       tutor: tutorId,
-      isVisible: true 
+      isVisible: true,
     });
 
     // Get paginated courses
@@ -484,8 +484,8 @@ const viewTutor = async (req, res) => {
         currentPage: page,
         totalPages,
         totalCourses,
-        coursesPerPage: limit
-      }
+        coursesPerPage: limit,
+      },
     });
   } catch (error) {
     console.error("Error in viewTutor:", error);
@@ -552,8 +552,8 @@ const buyCourse = async (req, res) => {
     console.log("Received Course ID in buyCourse:", courseId);
 
     const course = await Course.findById(courseId)
-      .populate('tutor', 'name') 
-      .select('coursetitle price thumbnail lessons difficulty');
+      .populate("tutor", "name")
+      .select("coursetitle price thumbnail lessons difficulty");
     if (!course) {
       console.error("Course not found for ID:", courseId);
       return res.status(404).json({ message: "Course not found" });
@@ -565,7 +565,7 @@ const buyCourse = async (req, res) => {
         price: course.price,
         thumbnail: course.thumbnail,
         tutor: course.tutor,
-        lessons: course.lessons.map(lesson => ({
+        lessons: course.lessons.map((lesson) => ({
           title: lesson.title,
           duration: lesson.duration,
         })),
@@ -579,30 +579,38 @@ const buyCourse = async (req, res) => {
 
 const buyAllCourses = async (req, res) => {
   try {
-    console.log("---------------------")
+    console.log("---------------------");
     const { userId, courseIds } = req.body;
 
     const courses = await Course.find({ _id: { $in: courseIds } })
-      .populate('tutor', 'name')
-      .select('coursetitle price thumbnail lessons difficulty');
-    
+      .populate("tutor", "name")
+      .select("coursetitle price thumbnail lessons difficulty");
+
     if (!courses || courses.length === 0) {
       return res.status(404).json({ message: "No courses found" });
     }
 
-    const formattedCourses = courses.map(course => ({
+    const formattedCourses = courses.map((course) => ({
       _id: course._id,
       coursetitle: course.coursetitle,
       price: course.price,
       thumbnail: course.thumbnail,
       tutor: course.tutor,
-      lessons: course.lessons.map(lesson => ({
+      lessons: course.lessons.map((lesson) => ({
         title: lesson.title,
         duration: lesson.duration,
       })),
     }));
 
-    const totalPrice = formattedCourses.reduce((total, course) => total + course.price, 0);
+    const totalPrice = formattedCourses.reduce(
+      (total, course) => total + course.price,
+      0
+    );
+    await Cart.findOneAndUpdate(
+      { userId },
+      { $set: { items: [] } },
+      { new: true }
+    );
 
     res.status(200).json({
       courses: formattedCourses,
@@ -619,7 +627,9 @@ const purchaseCourse = async (req, res) => {
     const { userId, courseIds } = req.body;
 
     if (!userId || !Array.isArray(courseIds) || courseIds.length === 0) {
-      return res.status(400).json({ error: "User ID and course IDs are required" });
+      return res
+        .status(400)
+        .json({ error: "User ID and course IDs are required" });
     }
 
     const purchase = new Purchase({
@@ -630,10 +640,14 @@ const purchaseCourse = async (req, res) => {
 
     await purchase.save();
 
-    await Promise.all(courseIds.map(async (courseId) => {
-      await Course.findByIdAndUpdate(courseId, { $inc: { totalStudents: 1 } });
-      await checkAndUpdateCourseVisibility(courseId);
-    }));
+    await Promise.all(
+      courseIds.map(async (courseId) => {
+        await Course.findByIdAndUpdate(courseId, {
+          $inc: { totalStudents: 1 },
+        });
+        await checkAndUpdateCourseVisibility(courseId);
+      })
+    );
 
     res.status(200).json({ message: "Purchase recorded successfully" });
   } catch (error) {
@@ -642,18 +656,17 @@ const purchaseCourse = async (req, res) => {
   }
 };
 
-
 const checkPurchaseStatus = async (req, res) => {
   try {
     const { userId, courseId } = req.params;
-    
+
     const purchase = await Purchase.findOne({
       userId,
-      'items.courseId': courseId
+      "items.courseId": courseId,
     });
 
     res.status(200).json({
-      isPurchased: !!purchase
+      isPurchased: !!purchase,
     });
   } catch (error) {
     console.error("Error checking purchase status:", error);
@@ -666,8 +679,8 @@ const getPurchasedCourses = async (req, res) => {
     const { userId } = req.params;
 
     const purchases = await Purchase.find({ userId });
-    const purchasedCourseIds = purchases.flatMap(purchase => 
-      purchase.items.map(item => item.courseId.toString())
+    const purchasedCourseIds = purchases.flatMap((purchase) =>
+      purchase.items.map((item) => item.courseId.toString())
     );
 
     res.status(200).json({ purchasedCourses: purchasedCourseIds });
@@ -680,22 +693,24 @@ const getPurchasedCourses = async (req, res) => {
 const viewLessonsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log("ithaanu :",courseId)
+    console.log("ithaanu :", courseId);
 
     const lessons = await Lesson.find({ course: courseId })
-      .populate('course', 'coursetitle')
-      .populate('tutor', 'name');
+      .populate("course", "coursetitle")
+      .populate("tutor", "name");
 
-      console.log("supperjgbiiog========>",lessons)
+    console.log("supperjgbiiog========>", lessons);
 
     if (!lessons || lessons.length === 0) {
-      return res.status(404).json({ message: 'No lessons found for this course' });
+      return res
+        .status(404)
+        .json({ message: "No lessons found for this course" });
     }
 
     res.status(200).json({ lessons });
   } catch (error) {
-    console.error('Error fetching lessons by course:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Error fetching lessons by course:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -706,7 +721,9 @@ const getBuyedCourses = async (req, res) => {
     const limit = parseInt(req.query.limit) || 9; // Changed to 9 for a 3x3 grid
     const skip = (page - 1) * limit;
 
-    console.log(`Fetching courses for user: ${userId}, page: ${page}, limit: ${limit}`);
+    console.log(
+      `Fetching courses for user: ${userId}, page: ${page}, limit: ${limit}`
+    );
 
     const totalCount = await Purchase.countDocuments({ userId });
 
@@ -729,7 +746,9 @@ const getBuyedCourses = async (req, res) => {
 
     const totalPages = Math.ceil(totalCount / limit);
 
-    console.log(`Found ${purchasedCourses.length} purchased courses for user ${userId} on page ${page}`);
+    console.log(
+      `Found ${purchasedCourses.length} purchased courses for user ${userId} on page ${page}`
+    );
     console.log(`Total pages: ${totalPages}, Total courses: ${totalCount}`);
 
     res.status(200).json({
@@ -738,8 +757,8 @@ const getBuyedCourses = async (req, res) => {
         currentPage: page,
         totalPages,
         totalCourses: totalCount,
-        coursesPerPage: limit
-      }
+        coursesPerPage: limit,
+      },
     });
   } catch (error) {
     console.error("Error fetching purchased courses:", error);
@@ -765,29 +784,32 @@ const getUserOrderHistory = async (req, res) => {
         populate: {
           path: "tutor",
           model: "user",
-          select: "name"
-        }
+          select: "name",
+        },
       })
       .sort({ purchaseDate: -1 })
       .skip(skip)
       .limit(limit);
 
-    const orderHistory = purchases.map(purchase => ({
+    const orderHistory = purchases.map((purchase) => ({
       orderId: purchase._id,
       purchaseDate: purchase.purchaseDate,
-      items: purchase.items.map(item => ({
+      items: purchase.items.map((item) => ({
         courseName: item.courseId.coursetitle,
         tutorName: item.courseId.tutor.name,
-        price: item.courseId.price
+        price: item.courseId.price,
       })),
-      totalAmount: purchase.items.reduce((total, item) => total + item.courseId.price, 0)
+      totalAmount: purchase.items.reduce(
+        (total, item) => total + item.courseId.price,
+        0
+      ),
     }));
 
     res.status(200).json({
       orderHistory,
       currentPage: page,
       totalPages,
-      totalOrders
+      totalOrders,
     });
   } catch (error) {
     console.error("Error fetching user order history:", error);
@@ -795,14 +817,18 @@ const getUserOrderHistory = async (req, res) => {
   }
 };
 
-
 const reportCourse = async (req, res) => {
   try {
     const { userId, courseId, reason, comment } = req.body;
 
-    const purchase = await Purchase.findOne({ userId, "items.courseId": courseId });
+    const purchase = await Purchase.findOne({
+      userId,
+      "items.courseId": courseId,
+    });
     if (!purchase) {
-      return res.status(403).json({ message: "You can only report courses you have purchased." });
+      return res
+        .status(403)
+        .json({ message: "You can only report courses you have purchased." });
     }
 
     const course = await Course.findById(courseId);
@@ -813,7 +839,7 @@ const reportCourse = async (req, res) => {
     const report = new Report({
       userId,
       courseId,
-      tutorId: course.tutor, 
+      tutorId: course.tutor,
       reason,
       comment,
     });
@@ -822,23 +848,27 @@ const reportCourse = async (req, res) => {
     course.reportedCount += 1;
     await course.save();
 
-      const shouldHideCourse = 
-      (course.totalStudents > 10 && course.reportedCount > 0.4 * course.totalStudents) || 
+    const shouldHideCourse =
+      (course.totalStudents > 10 &&
+        course.reportedCount > 0.4 * course.totalStudents) ||
       (course.totalStudents <= 10 && course.reportedCount >= 6);
-      console.log(shouldHideCourse,"vjdsnjfv----------------------------")
+    console.log(shouldHideCourse, "vjdsnjfv----------------------------");
     if (shouldHideCourse && course.isVisible) {
-      console.log("iniside blocking-------------------")
+      console.log("iniside blocking-------------------");
       const updatedCourse = await Course.findByIdAndUpdate(
-        courseId, 
+        courseId,
         { isVisible: false },
         { new: true }
       );
-      course.isVisible = updatedCourse.isVisible; 
-      console.log(`Course ${courseId} has been hidden due to high report count.`);
+      course.isVisible = updatedCourse.isVisible;
+      console.log(
+        `Course ${courseId} has been hidden due to high report count.`
+      );
     }
 
-
-    res.status(201).json({ message: "Report submitted successfully.", report: savedReport });
+    res
+      .status(201)
+      .json({ message: "Report submitted successfully.", report: savedReport });
   } catch (error) {
     console.error("Error submitting report:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -848,7 +878,12 @@ const reportCourse = async (req, res) => {
 const addToWishlist = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
-    console.log("Adding to wishlist - Course ID:", courseId, "User ID:", userId);
+    console.log(
+      "Adding to wishlist - Course ID:",
+      courseId,
+      "User ID:",
+      userId
+    );
 
     let wishlist = await Wishlist.findOne({ userId });
     if (!wishlist) {
@@ -863,7 +898,9 @@ const addToWishlist = async (req, res) => {
 
     await wishlist.save();
     console.log("Wishlist updated successfully");
-    res.status(200).json({ message: "Course added to wishlist successfully!", wishlist });
+    res
+      .status(200)
+      .json({ message: "Course added to wishlist successfully!", wishlist });
   } catch (error) {
     console.error("Error in addToWishlist:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -883,69 +920,75 @@ const viewWishlist = async (req, res) => {
 
     if (!wishlist || wishlist.items.length === 0) {
       console.log("Wishlist is empty for User ID:", userId);
-      return res.status(200).json({ 
+      return res.status(200).json({
         wishlist: [],
         message: "Your wishlist is empty.",
         status: "empty",
         totalPages: 0,
-        currentPage: page
+        currentPage: page,
       });
     }
 
     const totalItems = wishlist.items.length;
     const totalPages = Math.ceil(totalItems / limit);
 
-    const paginatedItems = await Wishlist.findOne({ userId })
-      .populate({
-        path: "items",
-        model: "courses",
-        select: "coursetitle thumbnail price category",
-        options: { skip, limit },
-        populate: [
-          {
-            path: "tutor",
-            model: "user",
-            select: "name"
-          },
-          {
-            path: "category",
-            model: "categories",
-            select: "title"
-          }
-        ]
-      });
+    const paginatedItems = await Wishlist.findOne({ userId }).populate({
+      path: "items",
+      model: "courses",
+      select: "coursetitle thumbnail price category",
+      options: { skip, limit },
+      populate: [
+        {
+          path: "tutor",
+          model: "user",
+          select: "name",
+        },
+        {
+          path: "category",
+          model: "categories",
+          select: "title",
+        },
+      ],
+    });
 
-    const formattedWishlist = paginatedItems.items.map(course => ({
+    const formattedWishlist = paginatedItems.items.map((course) => ({
       id: course._id,
       coursetitle: course.coursetitle,
       thumbnail: course.thumbnail,
       price: course.price,
-      tutorname: course.tutor ? course.tutor.name : 'Unknown',
-      categoryname: course.category ? course.category.title : 'Uncategorized'
+      tutorname: course.tutor ? course.tutor.name : "Unknown",
+      categoryname: course.category ? course.category.title : "Uncategorized",
     }));
 
-    console.log(`Wishlist page ${page} retrieved successfully for User ID: ${userId}`);
-    res.status(200).json({ 
+    console.log(
+      `Wishlist page ${page} retrieved successfully for User ID: ${userId}`
+    );
+    res.status(200).json({
       wishlist: formattedWishlist,
       status: "success",
       totalPages,
-      currentPage: page
+      currentPage: page,
     });
   } catch (error) {
     console.error("Error in viewWishlist:", error);
-    res.status(500).json({ 
-      message: "We're having trouble fetching your wishlist. Please try again in a moment.",
+    res.status(500).json({
+      message:
+        "We're having trouble fetching your wishlist. Please try again in a moment.",
       error: error.message,
-      status: "error"
+      status: "error",
     });
   }
 };
 
-
 const removeFromWishlist = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
-    console.log("Removing from wishlist - Course ID:", courseId, "User ID:", userId);
+    console.log(
+      "Removing from wishlist - Course ID:",
+      courseId,
+      "User ID:",
+      userId
+    );
 
     const result = await Wishlist.updateOne(
       { userId },
@@ -954,30 +997,33 @@ const removeFromWishlist = async (req, res) => {
 
     if (result.modifiedCount === 0) {
       console.log("Course not found in wishlist or wishlist is empty");
-      return res.status(404).json({ message: "Course not found in wishlist or wishlist is empty" });
+      return res
+        .status(404)
+        .json({ message: "Course not found in wishlist or wishlist is empty" });
     }
 
     console.log("Course removed from wishlist successfully");
-    res.status(200).json({ message: "Course removed from wishlist successfully" });
+    res
+      .status(200)
+      .json({ message: "Course removed from wishlist successfully" });
   } catch (error) {
     console.error("Error in removeFromWishlist:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-
 const checkWishlistStatus = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
-    
+
     const wishlist = await Wishlist.findOne({ userId });
-    
+
     if (!wishlist) {
       return res.status(200).json({ isInWishlist: false });
     }
-    
+
     const isInWishlist = wishlist.items.includes(courseId);
-    
+
     res.status(200).json({ isInWishlist });
   } catch (error) {
     console.error("Error in checkWishlistStatus:", error);
@@ -985,15 +1031,20 @@ const checkWishlistStatus = async (req, res) => {
   }
 };
 
-
-
 const getCourseCompletionCertificate = async (req, res) => {
   try {
     const { courseId, userId } = req.params;
 
-    const purchase = await Purchase.findOne({ userId, "items.courseId": courseId });
+    const purchase = await Purchase.findOne({
+      userId,
+      "items.courseId": courseId,
+    });
     if (!purchase) {
-      return res.status(403).json({ message: "You must purchase the course to receive a certificate." });
+      return res
+        .status(403)
+        .json({
+          message: "You must purchase the course to receive a certificate.",
+        });
     }
 
     const latestQuizResult = await UserQuizResult.findOne({ userId, courseId })
@@ -1001,16 +1052,23 @@ const getCourseCompletionCertificate = async (req, res) => {
       .limit(1);
 
     if (!latestQuizResult) {
-      return res.status(404).json({ message: "No quiz results found for this course." });
+      return res
+        .status(404)
+        .json({ message: "No quiz results found for this course." });
     }
 
-    const percentageScore = (latestQuizResult.totalMarks / latestQuizResult.totalQuestions) * 100;
+    const percentageScore =
+      (latestQuizResult.totalMarks / latestQuizResult.totalQuestions) * 100;
 
     if (percentageScore < 90) {
-      return res.status(403).json({ message: "You need to score at least 90% to receive a certificate." });
+      return res
+        .status(403)
+        .json({
+          message: "You need to score at least 90% to receive a certificate.",
+        });
     }
 
-    const course = await Course.findById(courseId).populate('tutor', 'name');
+    const course = await Course.findById(courseId).populate("tutor", "name");
     const user = await User.findById(userId);
 
     if (!course || !user) {
@@ -1022,8 +1080,11 @@ const getCourseCompletionCertificate = async (req, res) => {
       courseName: course.coursetitle,
       tutorId: course.tutor._id, // Add this line to include the tutor ID
       tutorName: course.tutor.name,
-      completionDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
-      score: percentageScore.toFixed(2)
+      completionDate: new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+      }),
+      score: percentageScore.toFixed(2),
     };
 
     res.status(200).json({ certificateData });
@@ -1036,8 +1097,8 @@ const getCourseCompletionCertificate = async (req, res) => {
 const getTutorData = async (req, res) => {
   try {
     const { tutorId } = req.params;
-    const tutor = await User.findById(tutorId).select('name email');
-    
+    const tutor = await User.findById(tutorId).select("name email");
+
     if (!tutor) {
       return res.status(404).json({ message: "Tutor not found." });
     }
@@ -1054,28 +1115,28 @@ const viewCourseReports = async (req, res) => {
     const { courseId } = req.params;
 
     // Fetch the course details
-    const course = await Course.findById(courseId).select('coursetitle');
+    const course = await Course.findById(courseId).select("coursetitle");
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
     // Fetch all reports for this course
     const reports = await Report.find({ courseId })
-      .populate('userId', 'name email')
+      .populate("userId", "name email")
       .sort({ createdAt: -1 });
 
     // Prepare the response data
     const reportData = {
       courseTitle: course.coursetitle,
       totalReports: reports.length,
-      reports: reports.map(report => ({
+      reports: reports.map((report) => ({
         id: report._id,
         userName: report.userId.name,
         userEmail: report.userId.email,
         reason: report.reason,
         comment: report.comment,
-        reportedAt: report.createdAt
-      }))
+        reportedAt: report.createdAt,
+      })),
     };
 
     res.status(200).json(reportData);
@@ -1085,4 +1146,37 @@ const viewCourseReports = async (req, res) => {
   }
 };
 
-module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports,getTutorData};
+module.exports = {
+  viewAllCourse,
+  viewAllCourseAdmin,
+  viewCourse,
+  addCart,
+  viewCourseAdmin,
+  viewCart,
+  removeCart,
+  viewLessons,
+  viewAllCategory,
+  viewCategory,
+  viewAllTutors,
+  viewTutor,
+  toggleCourseVisibility,
+  viewMyCoursesAsTutor,
+  cartCount,
+  buyCourse,
+  buyAllCourses,
+  reportCourse,
+  purchaseCourse,
+  checkPurchaseStatus,
+  getPurchasedCourses,
+  viewLessonsByCourse,
+  getBuyedCourses,
+  getUserOrderHistory,
+  reportCourse,
+  addToWishlist,
+  viewWishlist,
+  checkWishlistStatus,
+  removeFromWishlist,
+  getCourseCompletionCertificate,
+  viewCourseReports,
+  getTutorData,
+};
