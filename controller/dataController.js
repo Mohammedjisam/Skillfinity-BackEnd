@@ -11,37 +11,17 @@ const { checkAndUpdateCourseVisibility } = require('../utils/courseUtils');
 
 const viewAllCourse = async (req, res) => {
   try {
-    const userId = req.query.userId; // Get userId from query params
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
     const skip = (page - 1) * limit;
 
-    // Get user's purchased courses
-    let purchasedCourseIds = [];
-    if (userId) {
-      const purchases = await Purchase.find({ userId });
-      purchasedCourseIds = purchases.flatMap(purchase => 
-        purchase.items.map(item => item.courseId.toString())
-      );
-    }
-
-    // Count total visible courses excluding purchased ones
-    const totalCourses = await Course.countDocuments({
-      isVisible: true,
-      _id: { $nin: purchasedCourseIds }
-    });
-
+    const totalCourses = await Course.countDocuments({ isVisible: true });
     const totalPages = Math.ceil(totalCourses / limit);
 
-    // Fetch courses
-    const courses = await Course.find({
-      isVisible: true,
-      _id: { $nin: purchasedCourseIds }
-    })
-      .populate("tutor", "name profileImage")
+    const courses = await Course.find({ isVisible: true })
+      .populate("tutor")
       .populate("lessons")
-      .populate("category", "title")
-      .sort({ createdAt: -1 })
+      .populate("category")
       .skip(skip)
       .limit(limit);
 
@@ -266,7 +246,6 @@ const cartCount = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 const viewCart = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -340,16 +319,7 @@ const viewCart = async (req, res) => {
   }
 };
 
-const clearCart = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    await Cart.findOneAndDelete({ userId });
-    res.status(200).json({ message: "Cart cleared successfully" });
-  } catch (error) {
-    console.error("Error in clearCart:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
+
 
 const removeCart = async (req, res) => {
   try {
@@ -473,11 +443,9 @@ const viewAllTutors = async (req, res) => {
   }
 };
 
-
 const viewTutor = async (req, res) => {
   try {
     const tutorId = req.params.id;
-    const userId = req.query.userId; // Get userId from query params
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 8;
     const skip = (page - 1) * limit;
@@ -490,35 +458,20 @@ const viewTutor = async (req, res) => {
       return res.status(404).json({ message: "Tutor not found" });
     }
 
-    // Get user's purchased courses
-    let purchasedCourseIds = [];
-    if (userId) {
-      const purchases = await Purchase.find({ userId });
-      purchasedCourseIds = purchases.flatMap(purchase => 
-        purchase.items.map(item => item.courseId.toString())
-      );
-    }
-
-    // Count total visible courses by this tutor, excluding purchased ones
+    // Get total count of visible courses
     const totalCourses = await Course.countDocuments({ 
       tutor: tutorId,
-      isVisible: true,
-      _id: { $nin: purchasedCourseIds }
+      isVisible: true 
     });
 
-    // Fetch courses
-    const courses = await Course.find({ 
-      tutor: tutorId, 
-      isVisible: true,
-      _id: { $nin: purchasedCourseIds }
-    })
+    // Get paginated courses
+    const courses = await Course.find({ tutor: tutorId, isVisible: true })
       .populate({
         path: "category",
         model: "categories",
         select: "title",
       })
-      .select("coursetitle thumbnail price category createdAt")
-      .sort({ createdAt: -1 })
+      .select("coursetitle thumbnail price category")
       .skip(skip)
       .limit(limit);
 
