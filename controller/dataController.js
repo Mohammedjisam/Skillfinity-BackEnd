@@ -581,6 +581,7 @@ const buyAllCourses = async (req, res) => {
   try {
     console.log("---------------------");
     const { userId, courseIds } = req.body;
+    console.log("uuuuuuuuuuuuuuuser",userId)
 
     const courses = await Course.find({ _id: { $in: courseIds } })
       .populate("tutor", "name")
@@ -607,9 +608,7 @@ const buyAllCourses = async (req, res) => {
       0
     );
     const cart=await Cart.findOneAndUpdate(
-      { userId },
-      { $set: { items: [] } },
-      { new: true }
+      { userId }
     );
 
     console.log("cart------------------>",cart)
