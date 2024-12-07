@@ -5,11 +5,14 @@ const getUsersByTutorCourses = async (req, res) => {
   try {
     const { tutorId } = req.params;
 
+    console.log('Received tutorId:', tutorId);
+
     if (!tutorId) {
       return res.status(400).json({ message: "Tutor ID is required." });
     }
 
     const courses = await Course.find({ tutor: tutorId }).select("_id");
+    console.log('Found courses:', courses);
 
     if (!courses.length) {
       return res
@@ -22,6 +25,8 @@ const getUsersByTutorCourses = async (req, res) => {
     const purchases = await Purchase.find({
       "items.courseId": { $in: courseIds },
     }).populate("userId", "name email");
+
+    console.log('Found purchases:', purchases);
 
     if (!purchases.length) {
       return res
@@ -38,10 +43,16 @@ const getUsersByTutorCourses = async (req, res) => {
       return { id: user._id, name: user.name, email: user.email };
     });
 
+    console.log('Unique users:', uniqueUsers);
+
     return res.status(200).json({ users: uniqueUsers });
   } catch (error) {
     console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Internal Server Error", error });
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message,
+      stack: error.stack 
+    });
   }
 };
 

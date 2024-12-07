@@ -561,19 +561,21 @@ const getAllStudentOrders = async (req, res) => {
         select: 'coursetitle price'
       });
 
+    console.log('Fetched orders:', JSON.stringify(orders, null, 2));
+
     const formattedOrders = orders.map(order => ({
       _id: order._id,
       createdAt: order.createdAt,
-      userId: {
-        name: order.userId.name,
-        email: order.userId.email
-      },
+      userId: order.userId ? {
+        name: order.userId.name || 'Unknown',
+        email: order.userId.email || 'Unknown'
+      } : { name: 'Unknown', email: 'Unknown' },
       items: order.items.map(item => ({
-        courseId: item.courseId._id,
-        coursetitle: item.courseId.coursetitle,
-        price: item.courseId.price
+        courseId: item.courseId ? item.courseId._id : null,
+        coursetitle: item.courseId ? item.courseId.coursetitle : 'Unknown',
+        price: item.courseId ? item.courseId.price : 0
       })),
-      totalAmount: order.items.reduce((total, item) => total + item.courseId.price, 0)
+      totalAmount: order.items.reduce((total, item) => total + (item.courseId ? item.courseId.price : 0), 0)
     }));
 
     // Calculate total revenue for all orders matching the filter
@@ -582,7 +584,7 @@ const getAllStudentOrders = async (req, res) => {
       select: 'price'
     });
     const totalRevenue = allOrders.reduce((total, order) => 
-      total + order.items.reduce((orderTotal, item) => orderTotal + (item.courseId?.price || 0), 0)
+      total + order.items.reduce((orderTotal, item) => orderTotal + (item.courseId ? item.courseId.price : 0), 0)
     , 0);
 
     res.status(200).json({
@@ -593,8 +595,8 @@ const getAllStudentOrders = async (req, res) => {
       totalRevenue
     });
   } catch (error) {
-    console.error("Error in getAdminOrders:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in getAllStudentOrders:", error);
+    res.status(500).json({ message: "Server error", error: error.toString(), stack: error.stack });
   }
 };
 
