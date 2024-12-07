@@ -244,22 +244,9 @@ const addCart = async (req, res) => {
 
 const cartCount = async (req, res) => {
   try {
-    console.log("In cart count----------");
     const { userId } = req.params;
-    console.log("User  ID received:", userId);
-
     const cart = await Cart.findOne({ userId });
-    if (!cart) {
-      console.log("Cart not found for user ID:", userId);
-      return res.status(200).json({
-        success: false,
-        message: "Cart is empty"
-      });
-    }
-
-    const totalItems = cart.items.length;
-    console.log("Total items in cart:", totalItems);
-
+    const totalItems = cart ? cart.items.length : 0;
     res.status(200).json({ totalItems });
   } catch (error) {
     console.error("Error in cartCount:", error);
@@ -271,65 +258,53 @@ const viewCart = async (req, res) => {
   try {
     const { userId } = req.body;
 
+    // Fetch the user's cart
     const cart = await Cart.findOne({ userId }).populate({
       path: "items.courseId",
-      model: "courses",
       select: "coursetitle thumbnail price difficulty lessons category tutor",
       populate: [
-        {
-          path: "category",
-          model: "categories",
-          select: "title",
-        },
-        {
-          path: "tutor",
-          model: "user",
-          select: "name",
-        },
-        {
-          path: "lessons",
-          model: "lessons",
-          select: "_id",
-        },
+        { path: "category", select: "title" },
+        { path: "tutor", select: "name" },
+        { path: "lessons", select: "_id" },
       ],
     });
 
-    // If no cart exists, return empty cart with success status
+    // Fetch the user's purchased courses
+    const purchases = await Purchase.find({ userId });
+    const purchasedCourseIds = purchases.flatMap(purchase => 
+      purchase.items.map(item => item.courseId.toString())
+    );
+
     if (!cart) {
       return res.status(200).json({
-        cart: {
-          userId,
-          items: [],
-        },
+        cart: { userId, items: [] },
         message: "Your cart is waiting to be filled with amazing courses!",
         success: true,
       });
     }
 
-    // Transform cart to include additional course details
+    // Filter out purchased courses from the cart
+    const filteredItems = cart.items.filter(item => 
+      !purchasedCourseIds.includes(item.courseId._id.toString())
+    );
+
     const enrichedCart = {
       ...cart.toObject(),
-      items: cart.items.map((item) => {
-        if (!item.courseId) {
-          return null; // Skip this item if courseId is null
-        }
+      items: filteredItems.map((item) => {
+        if (!item.courseId) return null;
         return {
           ...item.toObject(),
           courseId: {
             ...item.courseId.toObject(),
             totalLessonsCount: item.courseId.lessons ? item.courseId.lessons.length : 0,
             categoryName: item.courseId.category ? item.courseId.category.title : 'Uncategorized',
-            tutorName: item.courseId.tutor ? `${item.courseId.tutor.firstname || ''} ${item.courseId.tutor.lastname || ''}`.trim() : 'Unknown Tutor',
+            tutorName: item.courseId.tutor ? item.courseId.tutor.name : 'Unknown Tutor',
           },
         };
-      }).filter(Boolean), // Remove null items
+      }).filter(Boolean),
     };
 
-    // Return existing cart with enriched course details
-    res.status(200).json({
-      cart: enrichedCart,
-      success: true,
-    });
+    res.status(200).json({ cart: enrichedCart, success: true });
   } catch (error) {
     console.error("Error in viewCart:", error);
     res.status(500).json({
@@ -350,7 +325,6 @@ const clearCart = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 const removeCart = async (req, res) => {
   try {
@@ -388,6 +362,20 @@ const removeCart = async (req, res) => {
     res.status(200).json({ message: "Course removed from cart", cart });
   } catch (error) {
     console.error("Error in removeCart:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const checkPurchases = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const purchases = await Purchase.find({ userId });
+    const purchasedCourseIds = purchases.flatMap(purchase => 
+      purchase.items.map(item => item.courseId.toString())
+    );
+    res.status(200).json({ purchasedCourseIds });
+  } catch (error) {
+    console.error("Error checking purchases:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -625,40 +613,31 @@ const buyCourse = async (req, res) => {
   }
 };
 
+
 const buyAllCourses = async (req, res) => {
   try {
-    console.log("---------------------")
-    const { userId, courseIds } = req.body;
+    const { userId, courseIds, totalAmount } = req.body;
 
-    const courses = await Course.find({ _id: { $in: courseIds } })
-      .populate('tutor', 'name')
-      .select('coursetitle price thumbnail lessons difficulty');
-    
-    if (!courses || courses.length === 0) {
-      return res.status(404).json({ message: "No courses found" });
-    }
-
-    const formattedCourses = courses.map(course => ({
-      _id: course._id,
-      coursetitle: course.coursetitle,
-      price: course.price,
-      thumbnail: course.thumbnail,
-      tutor: course.tutor,
-      lessons: course.lessons.map(lesson => ({
-        title: lesson.title,
-        duration: lesson.duration,
-      })),
-    }));
-
-    const totalPrice = formattedCourses.reduce((total, course) => total + course.price, 0);
-
-    res.status(200).json({
-      courses: formattedCourses,
-      totalPrice,
+    // Process the purchase (you may want to add payment integration here)
+    const purchase = new Purchase({
+      userId,
+      courses: courseIds,
+      totalAmount,
     });
+    await purchase.save();
+
+    // Add courses to user's purchased courses
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { purchasedCourses: { $each: courseIds } },
+    });
+
+    // Clear the user's cart
+    await Cart.findOneAndDelete({ userId });
+
+    res.status(200).json({ success: true, message: "Courses purchased successfully" });
   } catch (error) {
     console.error("Error in buyAllCourses:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
 
@@ -666,27 +645,26 @@ const purchaseCourse = async (req, res) => {
   try {
     const { userId, courseIds } = req.body;
 
-    if (!userId || !Array.isArray(courseIds) || courseIds.length === 0) {
-      return res.status(400).json({ error: "User ID and course IDs are required" });
-    }
-
+    // Create a new purchase record
     const purchase = new Purchase({
       userId,
-      items: courseIds.map((courseId) => ({ courseId })),
+      courses: courseIds,
       purchaseDate: new Date(),
     });
-
     await purchase.save();
 
-    await Promise.all(courseIds.map(async (courseId) => {
-      await Course.findByIdAndUpdate(courseId, { $inc: { totalStudents: 1 } });
-      await checkAndUpdateCourseVisibility(courseId);
-    }));
+    // Add courses to user's purchased courses
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { purchasedCourses: { $each: courseIds } },
+    });
 
-    res.status(200).json({ message: "Purchase recorded successfully" });
+    // Clear the user's cart
+    await Cart.findOneAndDelete({ userId });
+
+    res.status(200).json({ success: true, message: "Courses purchased successfully" });
   } catch (error) {
-    console.error("Error saving purchase:", error);
-    res.status(500).json({ error: "Failed to record purchase" });
+    console.error("Error in purchaseCourse:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
 
@@ -1133,4 +1111,4 @@ const viewCourseReports = async (req, res) => {
   }
 };
 
-module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,clearCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports,getTutorData};
+module.exports = {viewAllCourse,viewAllCourseAdmin,viewCourse,addCart,viewCourseAdmin,viewCart,clearCart,removeCart,viewLessons,viewAllCategory,viewCategory,viewAllTutors,viewTutor,toggleCourseVisibility,viewMyCoursesAsTutor,cartCount,buyCourse,buyAllCourses,reportCourse,purchaseCourse,checkPurchases,checkPurchaseStatus,getPurchasedCourses,viewLessonsByCourse,getBuyedCourses,getUserOrderHistory,reportCourse,addToWishlist,viewWishlist,checkWishlistStatus,removeFromWishlist,getCourseCompletionCertificate,viewCourseReports,getTutorData};
