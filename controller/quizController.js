@@ -238,8 +238,14 @@ const getUserCertificates = async (req, res) => {
     const totalPages = Math.ceil(totalCertificates / limit);
 
     const certificates = await Certificate.find({ userId })
-      .populate('courseId', 'coursetitle')
-      .populate('tutorId', 'name')
+      .populate('courseId', 'coursetitle tutor')
+      .populate({
+        path: 'courseId',
+        populate: {
+          path: 'tutor',
+          select: 'name'
+        }
+      })
       .sort({ issuedDate: -1 })
       .skip(skip)
       .limit(limit);
@@ -248,8 +254,13 @@ const getUserCertificates = async (req, res) => {
       return res.status(404).json({ message: "No certificates found for this user." });
     }
 
+    const formattedCertificates = certificates.map(cert => ({
+      ...cert.toObject(),
+      tutorName: cert.courseId.tutor.name
+    }));
+
     res.status(200).json({
-      certificates,
+      certificates: formattedCertificates,
       currentPage: page,
       totalPages,
       totalCertificates
@@ -259,6 +270,7 @@ const getUserCertificates = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 module.exports = {
   getQuiz,addQuiz,submitQuizResult,issueCertificate,checkCertificate ,getUserCertificates
