@@ -3,7 +3,7 @@ name: Deploy Node.js App
 on:
   push:
     branches:
-      - main # Replace with your branch if different.
+      - main 
 
 jobs:
   deploy:

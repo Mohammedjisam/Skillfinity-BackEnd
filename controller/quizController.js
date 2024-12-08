@@ -59,25 +59,37 @@ const getQuiz = async (req, res) => {
       return res.status(400).json({ message: "Course ID is required." });
     }
 
-    // Find the quiz for the given course
+    // Find the quiz and populate course with tutor data
     const quiz = await Quiz.find({ courseId }).select('questions');
+    const course = await Course.findById(courseId).populate('tutor');
 
     if (!quiz) {
       return res.status(404).json({ message: "Quiz not found for this course." });
     }
-    const quizz=[]
+
+    const quizz = [];
     for (const element of quiz) {
-      quizz.push(...element.questions)
+      quizz.push(...element.questions);
     }
 
-    res.status(200).json({ message: "Quiz retrieved successfully.", quiz:{
-      questions:quizz
-    } });
+    res.status(200).json({ 
+      message: "Quiz retrieved successfully.", 
+      quiz: {
+        questions: quizz,
+        _id: quiz[0]?._id, // Include the quiz ID
+        courseData: {
+          tutorId: course.tutor._id,
+          tutorName: course.tutor.name
+        }
+      } 
+    });
   } catch (error) {
     console.error("Error fetching quiz:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
 
 const issueCertificate = async (req, res) => {
   try {
