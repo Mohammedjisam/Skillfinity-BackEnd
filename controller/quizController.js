@@ -169,7 +169,6 @@ const submitQuizResult = async (req, res) => {
     const totalQuestions = quiz.questions.length;
     let totalMarks = 0;
 
-
     const processedResults = questionResults.map((result) => {
       const question = quiz.questions.find((q) => q._id.toString() === result.questionId);
 
@@ -189,19 +188,30 @@ const submitQuizResult = async (req, res) => {
 
     const percentageScore = (totalMarks / totalQuestions) * 100;
 
-    // Save quiz result
-    const newQuizResult = new UserQuizResult({
-      userId,
-      courseId,
-      tutorId,
-      quizId,
-      questionResults: processedResults,
-      totalMarks,
-      totalQuestions,
-      percentageScore,
-    });
+    // Check if a result already exists for this user and quiz
+    let quizResult = await UserQuizResult.findOne({ userId, quizId });
 
-    await newQuizResult.save();
+    if (quizResult) {
+      // Update existing result
+      quizResult.questionResults = processedResults;
+      quizResult.totalMarks = totalMarks;
+      quizResult.totalQuestions = totalQuestions;
+      quizResult.percentageScore = percentageScore;
+    } else {
+      // Create new result
+      quizResult = new UserQuizResult({
+        userId,
+        courseId,
+        tutorId,
+        quizId,
+        questionResults: processedResults,
+        totalMarks,
+        totalQuestions,
+        percentageScore,
+      });
+    }
+
+    await quizResult.save();
 
     let certificateData = null;
     if (percentageScore >= 90) {
@@ -209,22 +219,33 @@ const submitQuizResult = async (req, res) => {
       const user = await User.findById(userId);
 
       if (course && user) {
-        const newCertificate = new Certificate({
-          userId,
-          tutorId,
-          courseId,
-          userName: user.name,
-          tutorName: course.tutor?.name || "Unknown Tutor",
-          courseName: course.coursetitle || "Course",
-          quizScorePercentage: percentageScore,
-        });
+        // Check if a certificate already exists
+        let certificate = await Certificate.findOne({ userId, courseId });
 
-        await newCertificate.save();
-        certificateData = newCertificate;
+        if (!certificate) {
+          certificate = new Certificate({
+            userId,
+            tutorId,
+            courseId,
+            userName: user.name,
+            tutorName: course.tutor?.name || "Unknown Tutor",
+            courseName: course.coursetitle || "Course",
+            quizScorePercentage: percentageScore,
+          });
+
+          await certificate.save();
+        } else {
+          // Update existing certificate if the new score is higher
+          if (percentageScore > certificate.quizScorePercentage) {
+            certificate.quizScorePercentage = percentageScore;
+            await certificate.save();
+          }
+        }
+        certificateData = certificate;
       }
     }
 
-    res.status(201).json({
+    res.status(200).json({
       message: "Quiz result submitted successfully.",
       result: {
         totalMarks,
