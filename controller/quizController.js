@@ -153,6 +153,7 @@ const checkCertificate = async (req, res) => {
   }
 };
 
+
 const submitQuizResult = async (req, res) => {
   try {
     const { userId, tutorId, courseId, quizId, questionResults } = req.body;
@@ -169,11 +170,12 @@ const submitQuizResult = async (req, res) => {
     const totalQuestions = quiz.questions.length;
     let totalMarks = 0;
 
-    const processedResults = questionResults.map((result) => {
+    const processedResults = await Promise.all(questionResults.map(async (result) => {
       const question = quiz.questions.find((q) => q._id.toString() === result.questionId);
 
       if (!question) {
-        throw new Error(`Invalid question ID: ${result.questionId}`);
+        console.error(`Question not found for ID: ${result.questionId}`);
+        return null;
       }
 
       const isCorrect = result.userAnswer === question.correctAnswer;
@@ -184,7 +186,14 @@ const submitQuizResult = async (req, res) => {
         userAnswer: result.userAnswer || null, 
         isCorrect,
       };
-    });
+    }));
+
+    // Filter out any null results (questions that weren't found)
+    const validResults = processedResults.filter(result => result !== null);
+
+    if (validResults.length !== questionResults.length) {
+      console.warn(`Some questions were not found. Processed ${validResults.length} out of ${questionResults.length} questions.`);
+    }
 
     const percentageScore = (totalMarks / totalQuestions) * 100;
 
@@ -193,7 +202,7 @@ const submitQuizResult = async (req, res) => {
 
     if (quizResult) {
       // Update existing result
-      quizResult.questionResults = processedResults;
+      quizResult.questionResults = validResults;
       quizResult.totalMarks = totalMarks;
       quizResult.totalQuestions = totalQuestions;
       quizResult.percentageScore = percentageScore;
@@ -204,7 +213,7 @@ const submitQuizResult = async (req, res) => {
         courseId,
         tutorId,
         quizId,
-        questionResults: processedResults,
+        questionResults: validResults,
         totalMarks,
         totalQuestions,
         percentageScore,
